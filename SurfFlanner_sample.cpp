@@ -255,11 +255,15 @@ void bg_temporaldifference(Mat currframe, Mat prevframe, Mat backgorund)
 #include <math.h>
 double calculate_angle(Point2f* points,RotatedRect rotrect)
 {
-	double angle;
-	if(points[0].x < points[3].x)
-		angle = atan(std::abs(points[3].y - points[0].y) / std::abs(points[0].x - points[3].x)) * (180 * 7 / 22);
+	double angle; Point2f p1,p2;
+	if(sqrt(pow(std::abs(points[1].x - points[2].x),2.0f) + pow(std::abs(points[1].y - points[2].y),2.0f)) > sqrt(pow(std::abs(points[1].x - points[0].x),2.0f) + pow(std::abs(points[1].y - points[0].y),2.0f)))
+		{p1 = points[1]; p2 = points[2];}
 	else
-		angle = 180.00 - atan((points[0].y - points[3].y) / (points[0].x - points[3].x)) * (180 * 7 / 22);
+		{p1 = points[0]; p2 = points[1];}
+	if(p1.x < p2.x)
+		angle = atan(std::abs(p1.y - p2.y) / std::abs(p1.x - p2.x)) * (180 * 7 / 22);
+	else
+		angle = 180.00 - atan(std::abs(p1.y - p2.y) / std::abs(p1.x - p2.x)) * (180 * 7 / 22);
 	return angle;}
 
 
@@ -613,15 +617,15 @@ int main()
 			 boundrect.height = boundrect.height * 200 / frame1 -> height;}
 			//rectangle(cv::Mat(im),boundrect,Scalar::all(255),1);
 			if(loopcount > 0){
-				printf("CHEcking entry\n");
+				printf("Checking entry\n");
 				if(thresh_type == 0){
-					boundrect.x = boundrect.x - 7 * 300/ frame1 -> width;
-					boundrect.y = boundrect.y - 7 * 200/ frame1 -> height;}
+					boundrect.x = boundrect.x - 12 * 300/ frame1 -> width;
+					boundrect.y = boundrect.y - 12 * 200/ frame1 -> height;}
 				else{
 					boundrect.x = boundrect.x - 20 * 300/ frame1 -> width;
 					boundrect.y = boundrect.y - 20 * 200/ frame1 -> height;}
-				boundrect.height = boundrect.height + int((20 * 300)/ frame1 -> width);
-				boundrect.width = boundrect.width + int((20 * 200)/ frame1 -> height);}
+				boundrect.height = boundrect.height + int((33 * 300)/ frame1 -> width);
+				boundrect.width = boundrect.width + int((33 * 200) / frame1 -> height);}
 			/*else
 			{
 			boundrect.x = boundrect.x + 3 * (COMprev.x - COM.x);
@@ -729,17 +733,22 @@ int main()
 			revert:
 			mfeature++;
 			printf("Mfeature : %d\n",mfeature);
-			if((angle < angleprev / 2 || angle > angleprev * 2)){
+			if((angle < angleprev / 1.5 || angle > angleprev * 1.5)){
 				if(mt.m00 < robot_area * 1.3 && mt.m00 > robot_area / 1.3)
 					goto printpos;
 			}
+			else
+				if((angle < angleprev / 2 || angle > angleprev * 2))
+					boundrect = PrevRect;
 			//if(mt.m00 > robot_area * 1.3){
 			if(mt.m00 < robot_area / 1.3){
-			boundrect.x = boundrect.x + 8 * 300 / frame1 -> width;
-			boundrect.y = boundrect.y + 8 * 200 / frame1 -> height;
+			boundrect.x = boundrect.x - 5 * 300 / frame1 -> width;
+			boundrect.y = boundrect.y - 5 * 200 / frame1 -> height;
 			boundrect.width = boundrect.width + 15 * 300 / frame1 -> width ;
 			boundrect.height = boundrect.height + 15 * 200 / frame1 -> height;}
 			if(mt.m00 > robot_area * 1.3 && mfeature < 2){
+				boundrect.x = boundrect.x = boundrect.x + 10 * 300 / frame1 -> height;
+				boundrect.y = boundrect.y + 10 * 200 / frame1 -> width;
 				boundrect.width = boundrect.width - 30 * 300 / frame1 -> width;
 				boundrect.height= boundrect.height  - 200 * 30 / frame1 -> height;}
 			PrevRect = boundrect;
@@ -808,11 +817,12 @@ int main()
 		}*/
 		//if(maxC_area == 3772.5)
 		//	imshow("Check",fmask);
-		if(maxC_area < robot_area / 1.2 || maxC_area > robot_area * 1.2){
+		if(maxC_area < robot_area / 1.15 || maxC_area > robot_area * 1.15){
 			track: 
 			boundcn = Mat::zeros(frame.size(),CV_8U);
 			recalc:
 			frame.copyTo(temp);	
+			temp.copyTo(boundcn);
 			buff = cv::Mat::zeros(frame.size(), CV_8U);
 			buff = temp(boundrect);
 			//medianBlur(buff,buff,3);
@@ -820,10 +830,22 @@ int main()
 			//if(maxC_area == 99.5){adaptiveThreshold(temp,temp,255,CV_ADAPTIVE_THRESH_GAUSSIAN_C ,CV_THRESH_BINARY_INV,11,2);
 			//Canny(temp,temp,200,255);}
 			//else
-			if(or_size == 120){
-				thresh = 40; thresh_type = 1;}
+			//if(maxC_area == 307.5){
+
+		//	if(or_size == 120){
+				//thresh = 40; thresh_type = 1;}
+			int max_thresh = 255;
+			if(!thresh_type && (cv::Mat(frame1).at<uchar>(Point((int)COM.x,(int)COM.y)) < 50))
+				{max_thresh = 90; thresh = 30; }
+			else if(thresh_type && (cv::Mat(frame1).at<uchar>(Point(COM.x,COM.y)) > 50)){
+				if(cv::Mat(frame1).at<uchar>(Point(COM)) > cv::Mat(frame1).at<uchar>(Point(boundrect.x + 50, boundrect.y + boundrect.height / 2)))
+				{thresh = 50; thresh_type = 0;}}
 			printf("Thresh Type : %d\n",thresh_type);
-			cv::threshold(buff,buff,50,255,thresh_type);
+			cv::threshold(buff,buff,thresh,max_thresh,thresh_type);
+			temp.copyTo(boundcn);
+			//cv::threshold(boundcn,boundcn,thresh,max_thresh,thresh_type);
+			rectangle(boundcn,boundrect,Scalar::all(255),1);
+			imshow("Check",boundcn);
 			//if(or_size == 79)
 			//adaptiveThreshold(temp,temp,255,CV_ADAPTIVE_THRESH_MEAN_C,CV_THRESH_BINARY,11,2);
 		//cv::erode(temp,temp,cv::Mat());
@@ -838,11 +860,7 @@ int main()
 			//buff.copyTo(cv::Mat(bound));
 			//Canny(buff,buff,80,255);		
 			//temp.copyTo(boundcn)'
-			temp.copyTo(boundcn);
-			rectangle(boundcn,boundrect,Scalar::all(255),1);
-			imshow("Check",boundcn);
-			//cvDrawCircle(&IplImage(boundcn),Point(boundrect.x,boundrect.y),5,Scalar::all(255),1);
-			//imshow("Check",boundcn);	
+			printf("Pixel brightness : %d\n",cv::Mat(frame1).at<uchar>(Point(COM)));
 			contours.clear();
 			findContours(buff, contours, hierarchy, CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
 			maxCarea = 0;
@@ -859,16 +877,16 @@ int main()
 				if(mt.m00 < robot_area / 1.2){
 				boundrect.x = boundrect.x + 3 * 300 / frame1 -> width;
 				boundrect.y = boundrect.y + 3 * 200 / frame1 -> height;
-				boundrect.width = boundrect.width + 24 * 300 / frame1 -> width;
-				boundrect.height = boundrect.height + 24 * 200 / frame1 -> height;}
+				boundrect.width = boundrect.width + 25 * 300 / frame1 -> width;
+				boundrect.height = boundrect.height + 25 * 200 / frame1 -> height;}
 				if(mt.m00 > robot_area * 1.2){
-				//	boundrect.x = boundrect.x + 5 * 300/ frame1 -> width;
-					//boundrect.y = boundrect.y + 5 * 200/ frame1 -> height;
+					boundrect.x = boundrect.x + 5 * 300/ frame1 -> width;
+					boundrect.y = boundrect.y + 5 * 200/ frame1 -> height;
 					printf("Width subtraction : %d\n", int((300 * 300) / im -> width));
 					boundrect.width = boundrect.width - int((20 * 300) / im -> width);
 					boundrect.height = boundrect.height - int(20 *  200/ frame1 -> height);}
 				check++;  PrevRect = boundrect; goto recalc;}check = 0;
-				if((maxCarea < robot_area / 1.3 || maxCarea > robot_area * 1.3) && mfeature <= 5)
+				if((maxCarea < robot_area / 1.3 || maxCarea > robot_area * 1.3) && mfeature <= 3)
 					goto revert;
 			boundcn = Mat::zeros(frame.size(),CV_8U);
 			drawContours(boundcn,contours,contor,Scalar::all(255),1);
@@ -889,15 +907,15 @@ int main()
 		drawContours(boundcn,contours,contour,Scalar::all(255),1);
 		rott_rect = minAreaRect(contours[contour]);}
 		rott_rect.points(rotrect);
-		/*for(int i = 0; i < 3 ; i++)
+		for(int i = 0; i < 3 ; i++)
 			line(boundcn,rotrect[i],rotrect[i+1],Scalar::all(255),1);
-		line(boundcn,rotrect[3],rotrect[0],Scalar::all(255),1); */
+		line(boundcn,rotrect[3],rotrect[0],Scalar::all(255),1); 
+		cvDrawCircle(&IplImage(boundcn),Point(rotrect[2]),3,Scalar::all(255),1);
 		angle = calculate_angle(rotrect,rott_rect);
 		boundrect.x += PrevRect.x;
 		boundrect.y += PrevRect.y;
-		if((angle < angleprev / 1.5 || angle > angleprev * 1.5) && mfeature <= 4){printf("Angle curr Angle prev : %f %f\n",angle,angleprev);
+		if((std::abs(angleprev - angle) != 180) && (angle < angleprev / 1.5 || angle > angleprev * 1.5) && mfeature <= 3){printf("Angle curr Angle prev : %f %f\n",angle,angleprev);
 			goto revert;}
-		mfeature = 0;
 		printf("Angle: %f\n",calculate_angle(rotrect,rott_rect));
 		COM.x = mt.m10/mt.m00; COM.y = mt.m01/mt.m00;
 		COM.x += PrevRect.x; COM.y += PrevRect.y;
@@ -905,6 +923,7 @@ int main()
 		//rectangle(boundcn,boundrect,Scalar::all(255),1);
 		//cvDrawCircle(&IplImage(boundcn),Point(COM.x,COM.y),5,Scalar::all(255),1);	
 		PrevRect = boundrect;
+		mfeature = 0;
 		COM.x = (COM.x *  frame1 -> width) / 300;
 		COM.y = (COM.y * frame1 -> height) / 200;
 		//if(maxC_area == 3772.5)
@@ -912,10 +931,6 @@ int main()
 		//printf("Pixel Values : %d\n",int(frame.at<uchar>(COM)));
 		int x = COM.x ;int y= COM.y;
 		printf("COM : %d %d \n", x,y);
-		if((cv::Mat(frame1).at<uchar>(Point(x,y)) < cv::Mat(frame1).at<uchar>(Point(boundrect.x + boundrect.width + 70,boundrect.y + boundrect.height / 2))) && maxCarea != 204.00)
-		{thresh_type = 1; thresh = 40;}
-		else
-			thresh_type = 0;
 		/*throw 1;
 		}
 		catch(int n){}*/
@@ -951,7 +966,9 @@ int main()
 		CvFont font;
 		if(loopcount == 0)
 			angleprev = angle = calculate_angle(rotrect,rott_rect);
-		if((!mfeature) && (angle > angleprev / 1.5 || angle < angleprev * 1.5))
+		if((!mfeature) && (angle > angleprev / 1.5 && angle < angleprev * 1.5))
+		{angleprev = calculate_angle(rotrect,rott_rect);printf("Angle prev update \n"); framecount = loopcount; }
+		if((loopcount - framecount > 3) && !mfeature)
 			angleprev = calculate_angle(rotrect,rott_rect);
 		string angle[] = {"Angle",":","degrees"};
 		string angle_s = angle[0]+angle[1]+std::to_string(long double(angleprev))+angle[2];
