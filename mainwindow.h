@@ -4,6 +4,8 @@
 #include <QMainWindow>
 #include <QtGui>
 #include "FlyCapture2.h"
+//#include "ui_mainwindow.h"
+//#include "thread.h"
 #include<conio.h>
 #include<stdio.h>
 #include<iostream>
@@ -38,30 +40,42 @@ class MainWindow : public QMainWindow
     Q_OBJECT
     
 public:
-	int selectObject, loopcount, first_press, trackObject, fauto_press, value, clicks, time_duration;
-	Mat image, object, temp, lbutton_up, waypts_sans, tmplate;
-	IplImage * im;
-	bool mouseevent_valid;
-	Point waypoints[4];
+	int selectObject, loopcount, first_press, trackObject, fauto_press, value, clicks, backgrnd_clicks, time_duration, mfeature, thresh, max_thresh, thresh_type, contour, pixdiffx, pixdiffy;
+	Mat image, object, temp, lbutton_up, waypts_sans, tmplate, gimage, update_tmp;
+	IplImage * im, * src_img;
+	bool mouseevent_valid, stop_capture;
+	double factorx, factory;
+	Point2f waypoints[4];
 	BusManager busMgr;
 	PGRGuid guid;
 	Image rawImage, convertedimage;
 	FrameRate fps; VideoMode vd;
+	Size img_stream;
 	ImageMetadata metadata;
 	Error error;
 	Camera cam;
 	QImage * Qim;
+	QMutex mutex;
 	QSignalMapper * mapper;
 	QGraphicsScene * scene;
 	QVBoxLayout * scroll_layout;
 	CvCapture * cap;
-	Rect selection, boundrect, PrevRect;
+	Rect selection, boundrect, PrevRect, backgrndptsrect;
+	string point;
 	CvFont font;
-	Point origin;
-	CvPoint COM;
+	double angleprev, angle;
+	Moments mm;
+	std::vector<std::vector<Point>> contours, backgrnd_contours;
+	std::vector<int> backgrnd_contnos;
+	//CvSeq *backgrnd_contours;
+	CvSeq * backgrnd_approx;
+	CvMemStorage * storage;
+	std::vector<Vec4i> hierarchy;
+	Point origin, pixelcheck, * backgrnd_pts;
+	Point2f COM, COMprev;
 	BYTE datasend[7], prevsent[7];
 	HANDLE serialHandle, m_threadDoneEvent;
-	Ui::MainWindow *ui; 
+	stringstream ss;
 	static void mouseHandler(int ,int , int ,int , void*);
 	double calculate_angle(Point2f *,RotatedRect);
 	void onMouse( int ,int , int ,int , void*);
@@ -70,7 +84,6 @@ public:
 	void mouseReleaseEvent(QMouseEvent * ev);
 	void keyPressEvent(QKeyEvent * ev);
 	void DelayMS(UINT);
-	void on_Stopcapturepb_pushed();
 	QImage * Mat2QImage(Mat const&, QImage *);
 	Mat QImage2Mat(QImage const& );
 	IplImage * ImageToIplImage(QPixmap * qPix);
@@ -78,6 +91,8 @@ public:
 	bool send_serialportcommand(BYTE *);
     explicit MainWindow(QWidget *parent = 0);
 	bool dataTransfer(HANDLE *, BYTE *);
+	void * thread_control;
+	void * wayptspath_thread;
     ~MainWindow();
 
 //signals:
@@ -87,15 +102,23 @@ public slots:
 	//typedef void (MainWindow::*Method)(QString);
 	void on_Capturepb_pushed();
 	void learnTemplate();
+	void learn_backgroundfield();
 	void on_trackbt_pushed();
+	void on_Stopcapturepb_pushed();
 	//void on_coilcontrol_manual_pushed(QString);
 	void on_coilcontrol_automatic_pushed();
 	void on_closeapplication_pushed();
 	void on_learnwaypts_pb_pushed();
-	void on_autowayptspath_pb_pushed();
+	void nextwaypoint_pb_pushed();
+	//void on_autowayptspath_pb_pushed();
+	void thread_started(QString);
 	void retrieve_time();
 	void get_coilcommand(QString);
+	void on_getpixelval_cb_clicked();
+	void on_backgrndpts_cb_clicked();
 
+private:
+	Ui::MainWindow *ui; 
 };
 //Q_DECLARE_METATYPE(MainWindow::Method);
 

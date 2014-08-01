@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "thread_manualcontrol.h"
+#include "waypointspath_control.h"
 #include <ui_mainwindow.h>
 #include <qgraphicsview>
 #include <qsignalmapper.h>
@@ -37,12 +38,14 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 	selectObject = 0;
-	first_press = 0, loopcount = 0, fauto_press = 0,clicks = 0;
+	first_press = 0, loopcount = 0, fauto_press = 0,clicks = 0, backgrnd_clicks = 0;
 	mouseevent_valid = false;
 	scene  = new QGraphicsScene(this);
 	scene->setSceneRect(0,0,ui->Video_wn->width(),ui->Video_wn->height());
 	ui->Video_wn->setScene(scene);
+	backgrnd_pts = (Point *)malloc(sizeof(Point) * ui->backgrndclicks_label->text().toInt());
 	Qim = NULL;
+	factorx = 3; factory = 2.75;
 	m_threadDoneEvent = CreateEvent( NULL, FALSE, FALSE, NULL );
 	//ui->scrollArea->addScrollBarWidget(ui->scrollArea,Qt::Alignment
 	//ui->Video_wn->setMouseTracking(true);
@@ -55,10 +58,15 @@ MainWindow::MainWindow(QWidget *parent) :
 	QObject::connect(ui->autogo_pb,SIGNAL(clicked()),this,SLOT(on_coilcontrol_automatic_pushed()));
 	QObject::connect(ui->closewn_pb,SIGNAL(clicked()),this,SLOT(on_closeapplication_pushed()));
 	QObject::connect(ui->setwaypts_cb,SIGNAL(clicked()),this,SLOT(on_learnwaypts_pb_pushed()));
-	QObject::connect(ui->autowaypts_pb,SIGNAL(clicked()),this,SLOT(on_autowayptspath_pb_pushed()));
+	QObject::connect(ui->pixelval_cb,SIGNAL(clicked()),this,SLOT(on_getpixelval_cb_clicked()));
+	QObject::connect(ui->learnbackgnd_pb,SIGNAL(clicked()), this, SLOT(learn_backgroundfield()));
+	QObject::connect(ui->nextwaypt_pb,SIGNAL(clicked()),this,SLOT(nextwaypoint_pb_pushed()));
+	//QObject::connect(ui->autowaypts_pb,SIGNAL(clicked()),this,SLOT(on_autowayptspath_pb_pushed()));
 	//QThread * thread = new QThread();
-	Thread *thread = new Thread(0, this);
+	Thread_manualcontrol *thread = new Thread_manualcontrol(0, this);
 	thread_control = (void *)thread;
+	waypointspath_control * waypoints_thread = new waypointspath_control(0, this);
+	wayptspath_thread = (void *)waypoints_thread;
 	//thread->moveToThread(thread);
 	mapper = new QSignalMapper();
 	QSignalMapper * threadmap = new QSignalMapper();
@@ -72,12 +80,15 @@ MainWindow::MainWindow(QWidget *parent) :
 	mapper->setMapping(ui->upc_pb,QString("U"));
 	mapper->setMapping(ui->downc_pb, QString("D"));
 	mapper->setMapping(ui->termcurrent_pb,QString("C"));
+	mapper->setMapping(ui->autowaypts_pb,QString("W"));
 	QObject::connect(ui->leftc_pb, SIGNAL(clicked()),mapper, SLOT(map()));
 	QObject::connect(ui->topc_pb,SIGNAL(clicked()),mapper,SLOT(map()));
 	QObject::connect(ui->rightc_pb,SIGNAL(clicked()),mapper,SLOT(map()));
 	QObject::connect(ui->bottomc_pb,SIGNAL(clicked()),mapper,SLOT(map()));
 	QObject::connect(ui->upc_pb,SIGNAL(clicked()),mapper,SLOT(map()));
 	QObject::connect(ui->downc_pb,SIGNAL(clicked()),mapper,SLOT(map()));
+	QObject::connect(ui->autowaypts_pb,SIGNAL(clicked()),mapper,SLOT(map()));
+	//QObject::connect(ui->autowaypts_pb,SIGNAL(clicked()), this, SLOT(on_trackbt_pushed()));
 	/*QObject::connect(ui->leftc_pb, SIGNAL(clicked()),thread,SLOT(start()));
 	QObject::connect(ui->topc_pb,SIGNAL(clikced()),thread,SLOT(start()));
 	QObject::connect(ui->rightc_pb,SIGNAL(clicked()),thread,SLOT(start()));
@@ -113,12 +124,16 @@ MainWindow::MainWindow(QWidget *parent) :
 	streamlist = QStringList() <<QString("100") << QString("400") << QString("500") << QString("600") << QString("700") << QString("Default");
 	ui->extractthresh_dd->addItems(streamlist);
 	streamlist.clear();
-	streamlist = QStringList() << QString("30") << QString("40") << QString("90") << QString("100");
-	ui->threshlimit_dd->addItems(streamlist);
+	streamlist = QStringList() << QString("0") << QString("1");
+	ui->bckgrdthreshtype_dd->addItems(streamlist);streamlist.clear();
+	streamlist = QStringList() << "Enclosing" << "Non-Enclosing";
+	ui->backgrndtype_dd->addItems(streamlist);
+	/*streamlist = QStringList() << QString("30") << QString("40") << QString("90") << QString("100") << QString("125") << QString("160") << QString("200");
+	ui->threshlimit_le->addItems(streamlist);
 	streamlist.clear();
-	streamlist = QStringList() << QString("50") << QString("90") << QString("255");
-	ui->threshmax_dd->addItems(streamlist);
-	streamlist.clear();
+	streamlist = QStringList() << QString("50") << QString("90") << QString("125") << QString("150") << QString("200") <<QString("255");
+	ui->threshmax_le->addItems(streamlist);
+	streamlist.clear();*/
 	streamlist = QStringList() << QString("0") << QString("1");
 	ui->threshtype_dd->addItems(streamlist);
 	cvSetMouseCallback("Test", mouseHandler , this );
@@ -134,11 +149,32 @@ MainWindow::MainWindow(QWidget *parent) :
 }
 
 void MainWindow::thread_started(QString coil){
-	Thread * wthread = (Thread *)thread_control;
-	wthread->moveToThread(wthread);
-	wthread->time_duration = ui->td_le->text().toInt();
-	wthread->coil = coil.toStdString().c_str()[0];
-	wthread->start();
+	if(coil != "W"){
+		Thread_manualcontrol * mthread = (Thread_manualcontrol *)thread_control;
+		mthread->moveToThread(mthread);
+		mthread->time_duration = ui->td_le->text().toInt();
+		mthread->coil = coil.toStdString().c_str()[0];
+		mthread->start();
+	}
+	else{
+		waypointspath_control * wthread = (waypointspath_control *)wayptspath_thread;
+		wthread->moveToThread(wthread);
+		ss <<  ui->startcommand_le->text().toStdString();
+		ss >> std::hex >> value;
+		wthread->start_command = value;
+		wthread->conv_factor[0] = double(img_stream.width) / image.cols;
+		wthread->conv_factor[1] = double(img_stream.height) / image.rows;
+		if(ui->waypts_cycles->text().toInt() != 0)
+			wthread->cycles_no = ui->waypts_cycles->text().toInt();
+		else
+			wthread->cycles_no = 1;
+		qDebug() << "Conversion factor : " << wthread->conv_factor[0] << " Window width : " << image.cols;
+		wthread->start();
+		ui->track_cb->setChecked(true);
+		on_trackbt_pushed();
+		//emit ui->track_cb->clicked(true);
+		//ui->track_cb->clicked(true);
+	}
 	qDebug("GUI thread running status : %d",this->thread()->isRunning());
 }
 
@@ -146,7 +182,7 @@ void MainWindow::thread_started(QString coil){
 void MainWindow::on_Capturepb_pushed(){
 	//if(action.toStdString().c_str()[0] == 'E')
 		//return;
-    IplImage * src_img; stop_capture = false;
+   stop_capture = false;
 	//cv::VideoWriter output_video; 
 	CvVideoWriter * output_video;
 	if(ui->stream_filemenu->currentIndex() > 1){
@@ -219,11 +255,12 @@ void MainWindow::on_Capturepb_pushed(){
 		src_img = cvCreateImage(cvSize(convertedimage.GetCols(),convertedimage.GetRows()),IPL_DEPTH_8U,3);
 		memcpy(src_img->imageData, static_cast<uchar *>(convertedimage.GetData()), convertedimage.GetDataSize());
 		if(loopcount == 0)
+			img_stream = Size(src_img->width,src_img->height);
 		cvWriteFrame(output_video,src_img);
 		cv::resize(cv::Mat(src_img),temp,Size(ui->Video_wn->width(),ui->Video_wn->height()));
 		//output_video.write(cv::Mat(src_img));
 		temp.copyTo(image);
-		if(clicks && clicks <= 4 && ui->setwaypts_cb->isChecked()){
+		if(clicks && clicks <= ui->wayptsno_le->text().toInt() && ui->setwaypts_cb->isChecked()){
 			cvInitFont(&font,CV_FONT_HERSHEY_PLAIN,1.0,1.0);
 			for(int k = 0; k < clicks; k++)
 			{
@@ -232,6 +269,8 @@ void MainWindow::on_Capturepb_pushed(){
 				cvPutText(&IplImage(image),point.c_str(),Point(waypoints[k].x + 3, waypoints[k].y + 3),&font,Scalar::all(255));
 			}
 		}
+		if(pixelcheck.x && (ui->pixelval_cb->isChecked() || ui->backgrndpts_cb->isChecked()))
+			cvDrawCircle(&IplImage(image),pixelcheck,3,Scalar::all(255));
 		if(selection.x)
 			rectangle(image,selection,Scalar(255,0,0),1);
 		}
@@ -327,11 +366,17 @@ void MainWindow::mouseHandler(int event, int x, int y, int flags, void * param){
 
 double MainWindow::calculate_angle(Point2f* points,RotatedRect rotrect)
 {
-	double angle;
-	if(points[0].x < points[3].x)
-		angle = atan(std::abs(points[3].y - points[0].y) / std::abs(points[0].x - points[3].x)) * (180 * 7 / 22);
+	double angle; Point2f p1,p2;
+	if(sqrt(pow(std::abs(points[1].x - points[2].x),2.0f) + pow(std::abs(points[1].y - points[2].y),2.0f)) > sqrt(pow(std::abs(points[1].x - points[0].x),2.0f) + pow(std::abs(points[1].y - points[0].y),2.0f)))
+		{p1 = points[1]; p2 = points[2];}
 	else
-		angle = 180.00 - atan((points[0].y - points[3].y) / (points[0].x - points[3].x)) * (180 * 7 / 22);
+		{p1 = points[0]; p2 = points[1];}
+	if(p1.x < p2.x)
+		angle = atan(std::abs(p1.y - p2.y) / std::abs(p1.x - p2.x)) * (180 * 7 / 22);
+	else
+		angle = 180.00 - atan(std::abs(p1.y - p2.y) / std::abs(p1.x - p2.x)) * (180 * 7 / 22);
+	if(angleprev == 0 && angle == 180)
+		angle = 0;
 	return angle;}
 
 void MainWindow::mousePressEvent(QMouseEvent * ev){
@@ -349,7 +394,7 @@ void MainWindow::mousePressEvent(QMouseEvent * ev){
 	temp.copyTo(image);
 	image.copyTo(lbutton_up);
 	//if(ev->flags() == MOUSEEVENTF_LEFTDOWN
-	if(ev->button() == Qt::LeftButton){
+	if(ev->button() == Qt::LeftButton && !ui->setwaypts_cb->isChecked() && !ui->backgrndpts_cb->isChecked()){
 		origin = Point(ev->x() - ui->Video_wn->x() - 34 ,ev->y() - ui->Video_wn->y() - 14);
         selection = Rect(ev->x() - ui->Video_wn->x() - 34 ,ev->y() - ui->Video_wn->y() - 14,0,0);
 		//ui->camwn_label->setText(QString::number(ev->globalX() - ui->Video_wn->x() - 34)+QString(",")+QString::number(ev->globalY() - ui->Video_wn->y() - 34));
@@ -361,7 +406,7 @@ void MainWindow::mousePressEvent(QMouseEvent * ev){
 }
 }
 void MainWindow::mouseMoveEvent(QMouseEvent * ev){
-	if(!mouseevent_valid)
+	if(!mouseevent_valid || ui->backgrndpts_cb->isChecked())
 		return;
 	if(image.data){
 	cv::resize(cv::Mat(image),temp,Size(ui->Video_wn->width(),ui->Video_wn->height()));
@@ -386,22 +431,42 @@ void MainWindow::mouseMoveEvent(QMouseEvent * ev){
 void MainWindow::mouseReleaseEvent(QMouseEvent *ev){
 	if(!mouseevent_valid)
 		return;
+	if(ev->x() < ui->Video_wn->x() - 1|| ev->x() > ui->Video_wn->x() - 34 + ui->Video_wn->width())
+		return;
+	if(ev->y() < ui->Video_wn->y() - 14 || ev->y() > ui->Video_wn->y() - 14 + ui->Video_wn->height())
+		return;
 	if(image.data){
 	cv::resize(cv::Mat(image),temp,Size(ui->Video_wn->width(),ui->Video_wn->height()));
 	temp.copyTo(image);}
+	if(ui->backgrndpts_cb->isChecked()){
+		backgrnd_clicks++;
+		if(backgrnd_clicks <= ui->backgrndno_le->text().toInt()){
+			pixelcheck = Point(ev->x() - ui->Video_wn->x() - 34 ,ev->y() - ui->Video_wn->y() - 14);
+			backgrnd_pts[backgrnd_clicks - 1] = Point(ev->x() - ui->Video_wn->x() - 34 ,ev->y() - ui->Video_wn->y() - 14);}
+		else backgrnd_clicks = 0;
+		ui->backgrndclicks_label->setText(QString::number(backgrnd_clicks));
+		releaseMouse();
+		return;
+	}
+	if(ui->pixelval_cb->isChecked() && image.data){
+		pixelcheck = Point(ev->x() - ui->Video_wn->x() - 34 ,ev->y() - ui->Video_wn->y() - 14);
+		cvDrawCircle(&IplImage(image),Point(ev->x() - ui->Video_wn->x() - 34 ,ev->y() - ui->Video_wn->y() - 14),3,Scalar::all(255));
+		cvtColor(image,gimage,CV_BGR2GRAY);
+		ui->pixelvalue->setText(QString::number(gimage.at<uchar>(Point(pixelcheck))));
+	}
 	if(ui->setwaypts_cb->isChecked())
 	{   
 		if(clicks == 0)
 			image.copyTo(waypts_sans);
 		clicks++; string point; 
-		if(clicks <= 4){
-			waypoints[clicks - 1] = Point(ev->x() - ui->Video_wn->x() - 34 ,ev->y() - ui->Video_wn->y() - 14);
+		if(clicks <= ui->wayptsno_le->text().toInt()){
+			waypoints[clicks - 1] = Point2f(ev->x() - ui->Video_wn->x() - 34 ,ev->y() - ui->Video_wn->y() - 14);
 			//for(int k = 0; k < clicks; k++)
 			//{
 				//ui->camwn_label->setText(QString::number(clicks));
-				cvDrawCircle(&IplImage(image),cvPoint(waypoints[clicks - 1].x,waypoints[clicks - 1].y),3,Scalar::all(255),1);
+				/*cvDrawCircle(&IplImage(image),cvPoint(waypoints[clicks - 1].x,waypoints[clicks - 1].y),3,Scalar::all(255),1);
 				point = string("Waypoint") + std::to_string(long double(clicks));
-				cvPutText(&IplImage(image),point.c_str(),Point(waypoints[clicks - 1].x + 3, waypoints[clicks - 1].y + 3),&font,Scalar::all(255));
+				cvPutText(&IplImage(image),point.c_str(),Point(waypoints[clicks - 1].x + 3, waypoints[clicks - 1].y + 3),&font,Scalar::all(255));*/
 			//}
 			//cvDrawCircle(&IplImage(image),cvPoint(ev->x(),ev->y()),3,Scalar(0,255,0),1);
 			//point = string("Destination") + std::to_string(long double(clicks));
@@ -414,7 +479,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *ev){
 		releaseMouse();
 		return;
 	}
-	clicks = 0;
+	//clicks = 0;
 	if(image.data){
 	if(ev->button() == Qt::LeftButton && selectObject)
 	{
@@ -428,10 +493,43 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *ev){
 		releaseMouse();
 	}
 	}}
+
+void MainWindow::on_getpixelval_cb_clicked(){
+	if(ui->pixelval_cb->isChecked())
+		ui->pixelvalue->setEnabled(true);
+	else
+		ui->pixelvalue->setEnabled(false);
+}
+
+void MainWindow::on_backgrndpts_cb_clicked(){
+	if(!ui->backgrndpts_cb->isChecked()){
+		ui->backgrndclicks_label->setEnabled(false);
+		ui->learnbackgnd_pb->setEnabled(false);}
+	else{ui->learnbackgnd_pb->setEnabled(true);
+	ui->backgrndclicks_label->setEnabled(true);}}
+
 void MainWindow::keyPressEvent(QKeyEvent * ev){
 	//ui->camwn_label->setText(QString("Key event : ")+QString::number(ev->key()));
-	if(ev->key() == 16777216)
+	if(ev->key() == 16777216){
 		ui->track_cb->setChecked(false);
+		waypointspath_control * wayptsthread = (waypointspath_control *)wayptspath_thread;
+		if(wayptsthread->isRunning()){
+			//QMutexLocker locker(&mutex);
+			mutex.lock();
+			wayptsthread->wayptno = clicks;
+			//CloseHandle(serialHandle);
+			wayptsthread->quit(); wayptsthread->wait();
+			mutex.unlock();
+		}
+	}
+}
+
+void MainWindow::nextwaypoint_pb_pushed(){
+	waypointspath_control * wthread = (waypointspath_control *)wayptspath_thread;
+	if(wthread->isRunning() && wthread->wayptno < ui->autowaypts_pb->text().toInt()){
+		mutex.lock();
+		wthread->wayptno++;
+		mutex.unlock();}
 }
 
 void MainWindow::learnTemplate()
@@ -452,6 +550,61 @@ void MainWindow::learnTemplate()
 	//if(!selectObject)
 		//on_trackbt_pushed();
 }
+
+void MainWindow::learn_backgroundfield(){
+	if(cam.IsConnected() && image.data)
+	{
+		cvtColor(image,update_tmp,CV_BGR2GRAY);
+		GaussianBlur(update_tmp,update_tmp,Size(3,3),0,0,BORDER_DEFAULT);
+		cv::threshold(update_tmp,update_tmp, ui->bckgrdthreshlimit_le->text().toInt(),ui->bckgrdthreshmax_le->text().toInt(),ui->bckgrdthreshtype_dd->currentText().toInt());
+		//imshow("Background Field",update_tmp);
+		findContours(update_tmp, backgrnd_contours, hierarchy, CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);	
+		storage = cvCreateMemStorage(0);
+		//cvFindContours(&IplImage(update_tmp), storage, &backgrnd_contours, sizeof(CvContour), CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE, cvPoint(0,0));
+		temp = Mat::zeros(image.size(), CV_8UC1);
+		//im = cvCreateImage(Size(image.cols,image.rows),CV_8U,1);
+		contour = 0;
+		//if(backgrnd_contours.size())
+			//backgrnd_contours.clear();
+		//backgrnd_contours = std::vector<vector<Point>>(contours.size());
+		if(backgrnd_contnos.size())
+			backgrnd_contnos.clear();
+		//for(int i = 0; i < contours.size(); i++)
+			//approxPolyDP(contours[i],backgrnd_contours[i],3,1);
+		//backgrnd_approx = cvApproxPoly(backgrnd_contours,sizeof(CvContour), storage, CV_POLY_APPROX_DP, cvContourPerimeter(backgrnd_contours)*0.02,0);
+		//qDebug() << " approx Poly Contours Size :" << backgrnd_contours.size()<< " CvSeq  Contours Size : " << contours.size();
+		//CvSeq * current = backgrnd_contours;
+		//backgrnd_contours.resize(backgrnd_contours,
+		//for (current = backgrnd_contours; current != NULL; current = current -> h_next)
+		for(int i = 0; i < backgrnd_contours.size(); i++)
+		{
+			//mm = cv::moments(contours[i], false);
+			for(int j = 0; j < ui->backgrndno_le->text().toInt(); j++){
+				//drawContours(temp,backgrnd_contours,i, Scalar::all(255),1);
+			//	ui->camwn_label->setText(QString::number(cvPointPolygonTest(&Mat(contours[i]),backgrnd_pts[j],1) < 15));
+				if(std::abs(pointPolygonTest(Mat(backgrnd_contours[i]),backgrnd_pts[j],1)) < 5){
+				//if(boundingRect(Mat(contours[i])).contains(backgrnd_pts[j]))
+					//backgrnd_approx = current; 
+						if(std::find(backgrnd_contnos.begin(),backgrnd_contnos.end(),i) == backgrnd_contnos.end())
+							backgrnd_contnos.push_back(i);}
+					qDebug() << " Point check on contour Polygon "<<i<<" approx : "<<pointPolygonTest(Mat(backgrnd_contours[i]),backgrnd_pts[j],1);
+				}
+		}
+		//temp = cv::Mat(image.size(),CV_8UC1);
+		qDebug() << " approx Poly Contours no :" << contour << " CvSeq  Contours Size : " << contours.size();
+		if(backgrnd_contours.size()){
+			for(int i = 0; i < backgrnd_contnos.size(); i++){
+			for(int j = 0; j < backgrnd_contours[backgrnd_contnos[i]].size(); j++){
+				backgrnd_contours[backgrnd_contnos[i]][j].x = backgrnd_contours[backgrnd_contnos[i]][j].x * 300 / image.cols;
+				backgrnd_contours[backgrnd_contnos[i]][j].y = backgrnd_contours[backgrnd_contnos[i]][j].y * 200 / image.rows;
+			}
+			drawContours(temp,backgrnd_contours,backgrnd_contnos[i],Scalar::all(255));
+			}
+		}
+		//cvDrawContours(&IplImage(temp),backgrnd_contours->h_next->h_next,Scalar::all(255),Scalar::all(255),100,1);
+		im = &IplImage(temp);
+		imshow("Background Field",cv::Mat(im));
+	}}
 
 void MainWindow::on_trackbt_pushed(){
 	/*else{
@@ -507,7 +660,7 @@ void MainWindow::on_trackbt_pushed(){
 	//if(im == NULL)
 	//	return;
 	double robot_area = 0.0;
-	Point2f COM, COMprev;Moments mt;
+	Moments mt;
    // detector -> detect( object, kp_object );
 	 std::vector<KeyPoint> kp_image;
      std::vector<vector<DMatch > > matches;
@@ -527,21 +680,19 @@ void MainWindow::on_trackbt_pushed(){
 	Mat background,mask;
 	//cv::Mat mask(object.rows,object.cols,object.depth());
 	cv::Rect rectLine;
-	std::vector<std::vector<Point>> contours;
 	std::vector<Vec4i> hierarchy;
 	Mat prevframe;
 	double maxC_area, maxCarea;
 	int contour, cam_mot = 0,contor; 
 	Mat frame;
-	int mfeature = 0, thresh_type = 0, thresh = 50;
+	//Point2f COM;
+	mfeature = 0, thresh_type = 0, thresh = 50, max_thresh = 255;
 	IplImage * frameprev, * frame1, *frame_small, *object_small = cvCreateImage(cvSize((int)(object.cols / 5),(int)(object.rows / 5)),IPL_DEPTH_8U,object.channels());
     int framecount = 0; int corner_count, or_size;
 	std::vector<Point> approx;
 	RotatedRect rott_rect;Point2f rotrect[4];
 	time_t start,end;Mat boundcn;
 	string pos,position[] = {"Position is (",",",")"},angle_t[] = {"Angle",":","degrees"},angle_s;
-	CvFont font;
-	double angleprev, angle;
 	CvPoint org;
 	start = time(NULL);
 	clock_t st,en;
@@ -572,8 +723,8 @@ void MainWindow::on_trackbt_pushed(){
 			frameprev = cvCreateImage(cvGetSize(im),im->depth,im->nChannels);
 			cvConvertImage(im,frameprev);
 			frame1 = cvCreateImage(cvGetSize(im),IPL_DEPTH_8U,1);
-			boundrect.x = selection.x * im->width / ui->Video_wn->width();
-			boundrect.y = selection.y * im->height / ui->Video_wn->height();
+			boundrect.x = selection.x * im->width / image.cols;
+			boundrect.y = selection.y * im->height / image.rows;
 			boundrect.height = selection.height *  im->height / ui->Video_wn->height();
 			boundrect.width = selection.width * im->width / ui->Video_wn->width();
 		}
@@ -585,7 +736,7 @@ void MainWindow::on_trackbt_pushed(){
 		GaussianBlur( frame, frame, Size(3,3), 0, 0, BORDER_DEFAULT );
 		//IplImage * image = cvCreateImage(cvGetSize(im), im->depth, 1);
 		bgsub(frame,fgmask);
-		if(loopcount == 0 || mfeature == -1){
+		if(loopcount == 0){
 			feature_track:
 			detector -> detect( object, kp_object );
 		extractor->compute( object, kp_object, des_object );
@@ -618,7 +769,7 @@ void MainWindow::on_trackbt_pushed(){
 		}
         //Draw only "good" matches
 		//drawMatches( object, kp_object, image, kp_image, good_matches, img_matches, Scalar::all(-1), Scalar::all(-1), vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-		//ui->camwn_label->setText("Good Matches :"+QString::number(good_matches.size()));
+		qDebug()<<"Good Matches : "<<QString::number(good_matches.size());
 		if (good_matches.size() >= 4)
         {
 
@@ -639,29 +790,35 @@ void MainWindow::on_trackbt_pushed(){
 			line(cv::Mat(im), scene_corners[2], scene_corners[3], Scalar( 0, 255, 0), 4 );
 			line(cv::Mat(im), scene_corners[3], scene_corners[0] , Scalar( 0, 255, 0), 4 );
 		}
-
-		PrevRect = boundrect;
+		PrevRect = boundrect;//rectangle(cv::Mat(im),boundrect,Scalar::all(255),1);goto next;}
 		//rectLine = boundingRect(cv::Mat(scene_corners));
-		img_matches.convertTo(img_matches,CV_8U);
-		cv::Mat update_tmp; 
+		//img_matches.convertTo(img_matches,CV_8U);
 		//Canny(cv::Mat(image),temp,100,255);
 		//convertScaleAbs( frame, temp );
-		printf("\nTemporary image type : %d\n",temp.channels());
+		//printf("\nTemporary image type : %d\n",temp.channels());
 		//cvInRangeS(im,cv::Scalar(60,100,100),cv::Scalar(60,255,255),im);
 		//GaussianBlur(temp,temp,Size(3,3),0,0,BORDER_DEFAULT);
-		//cv::threshold(cv::Mat(frame1),temp,ui->threshlimit_dd->currentText().toInt(),ui->threshmax_dd->currentText().toInt(),ui->threshtype_dd->currentText().toInt());
-		temp = Mat(frame.size(),CV_8UC1);		
-		cv::threshold(cv::Mat(frame1),temp,25,255,0);
-		morphologyEx(temp,temp,cv::MORPH_CLOSE,cv::Mat());
+		mask = Mat::zeros(frame.size(),CV_8UC1);
+		for(int i = 0; i < backgrnd_contnos.size(); i++)
+			drawContours(mask,backgrnd_contours, backgrnd_contnos[i],Scalar(255),CV_FILLED);
+		bitwise_not(mask,mask);
+		if(backgrnd_contnos.size())
+			frame.copyTo(temp, mask);
+		else
+			frame.copyTo(temp);
 		update_tmp = temp(boundrect);
-		Canny(update_tmp,update_tmp,170,255);
+		cv::threshold(update_tmp,update_tmp,ui->threshlimit_le->text().toInt(),ui->threshmax_le->text().toInt(),ui->threshtype_dd->currentText().toInt());	
+		//cv::threshold(cv::Mat(frame1),temp,210,255,0);
+		update_tmp.copyTo(boundcn);
+		imshow("Check",boundcn);
+		//Canny(update_tmp,update_tmp,170,255);
 		findContours(update_tmp, contours, hierarchy, CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);		
 		maxC_area = 0;
 		contour = 0;
-		printf("\nNumber of contours : %d",contours.size());
+		qDebug("\nNumber of contours : %d",contours.size());
 		for (int i = 0; i < contours.size(); i++)
 		{
-			Moments mm = cv::moments(contours[i], false);
+			mm = cv::moments(contours[i], false);
 			//if(loopcount == 0) {
 			if(mm.m00 > maxC_area){
 				maxC_area  = mm.m00;contour = i;}//}
@@ -672,16 +829,15 @@ void MainWindow::on_trackbt_pushed(){
 		printf("\nARea of robot : %f\n",robot_area);
 		namedWindow("Check",WINDOW_AUTOSIZE);
 		background = cv::Mat(im);
-		mask = Mat::zeros(im->height,im->width,im->depth);
 		//mask = frame(rectLine);
 		//cvSetImageROI(&IplImage(mask),rectLine);
-		cv::Mat(im).copyTo(background);
+		//cv::Mat(im).copyTo(background);
 		//cvCopy(im,&IplImage(background));
-		rectangle(mask,rectLine,Scalar::all(255),1);
+		//rectangle(mask,rectLine,Scalar::all(255),1);
 		//frame.copyTo(background,mask);
 		boundcn = Mat::zeros(frame.size(),CV_8U);
 		drawContours(boundcn,contours,contour,Scalar::all(255),1);	
-		imshow("Check",boundcn);
+		//imshow("Check",boundcn);
 		roi = cv::Mat(im) - background;
 		//roi.copyTo(mask);
 		//if(loopcount == 1)
@@ -711,7 +867,7 @@ void MainWindow::on_trackbt_pushed(){
 			cv::resize(frame,temp,Size(300,200));  temp.copyTo(frame); 
 			cv::resize(fgmask,temp,Size(300,200)); temp.copyTo(fgmask);
 			GaussianBlur(fgmask,fgmask,Size(3,3),0,0);
-
+			//rectangle(cv::Mat(im),boundrect,Scalar::all(255),2);
 			if(loopcount > 0){
 			boundrect.y = int(boundrect.y * 200/ frame1->height);
 			boundrect.x = int(boundrect.x * 300/ frame1->width);
@@ -732,6 +888,7 @@ void MainWindow::on_trackbt_pushed(){
 					boundrect.y = boundrect.y - 20 * 200/ frame1 -> height;}
 				boundrect.height = boundrect.height + int((33 * 300)/ frame1 -> width);
 				boundrect.width = boundrect.width + int((33 * 200) / frame1 -> height);}	
+			
 			PrevRect  = boundrect;
 			//cvSetImageROI(&IplImage(fmask),boundrect);
 			//printf("Mean Value : %f",mean_matches.val[0]);
@@ -778,26 +935,37 @@ void MainWindow::on_trackbt_pushed(){
 				//mfeature = 1;
 				//cvCopy(im,frameprev);
 			//if(mfeature == 2)
-			if(or_size == 245){
-				rectangle(fmask,boundrect,Scalar::all(255),1);
-				}
+			//if(or_size == 245){
+				//rectangle(fmask,boundrect,Scalar::all(255),1);
+				//}
 			cvCopy(im,frameprev);
 			goto printpos;
 			bgsub(frame,fgmask);
 			}
 		//else{
 			fmask = fgmask(boundrect);
-			printf("COM : (%f,%f)\n",(COM.x),COM.y);
+			//qDebug("COM : (%f,%f)\n",(COM.x),COM.y);
 			//Laplacian(fgmask,fgmask,fgmask.depth(),3);convertScaleAbs(fgmask,fmask);
 			GaussianBlur(fmask,fmask,Size(3,3),0,0); 
-			cv::threshold(fmask,fmask,50,255,CV_THRESH_BINARY);
+			mask = Mat(frame.size(),CV_8UC1,Scalar(255));
+			for(int k = 0; k < backgrnd_contnos.size(); k++){
+				drawContours(mask, backgrnd_contours,backgrnd_contnos[k],Scalar(0), CV_FILLED);}
+				//drawContours(fmask,backgrnd_contours,backgrnd_contnos[k],Scalar(0));
+			fmask.copyTo(temp);
+			goto track;
+			//bitwise_not(mask,mask);
+			if(backgrnd_contnos.size()){
+				fmask = Mat(frame.size(),CV_8UC1);
+				temp.copyTo(fmask,mask);}
+			cv::threshold(fmask,fmask,thresh,max_thresh,CV_THRESH_BINARY);
 			//adaptiveThreshold(fgmask,fgmask,255,CV_ADAPTIVE_THRESH_GAUSSIAN_C,CV_THRESH_BINARY,11,2);
 			//medianBlur(fmask,fmask,3);
 			//Laplacian(fmask,fmask,fmask.depth(),3);convertScaleAbs(fgmask,fmask);	
 			morphologyEx(fmask,fmask,MORPH_CLOSE, cv::Mat());
-			IplImage * fmas = &IplImage(fmask);
+			//IplImage * fmas = &IplImage(fmask);
 			//	cvSetImageROI(fmas,boundrect);
-		findContours(cv::Mat(fmas), contours, hierarchy,CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+
+		findContours(cv::Mat(fmask), contours, hierarchy,CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 		maxC_area = 0;
 		contour = 0;
 		for(int i = 0; i < contours.size(); i++)
@@ -823,41 +991,75 @@ void MainWindow::on_trackbt_pushed(){
 			track: 
 			boundcn = Mat::zeros(frame.size(),CV_8U);
 			recalc:
-			frame.copyTo(temp);	
-			temp.copyTo(boundcn); 
+			//frame.copyTo(temp);	
+			//temp.copyTo(boundcn);
 			buff = cv::Mat::zeros(frame.size(), CV_8U);
-			buff = temp(boundrect);
 			//medianBlur(buff,buff,3);
 			GaussianBlur(buff,buff,Size(3,3),0,0,BORDER_DEFAULT);
 			//if(maxC_area == 99.5){adaptiveThreshold(temp,temp,255,CV_ADAPTIVE_THRESH_GAUSSIAN_C ,CV_THRESH_BINARY_INV,11,2);
 			//Canny(temp,temp,200,255);}
 			//else
 			//if(maxC_area == 307.5){
-
+			mask = Mat(frame.size(),CV_8UC1,Scalar::all(255));
+			for(int k = 0; k < backgrnd_contnos.size(); k++)
+			{
+				//drawContours(temp,backgrnd_contours,backgrnd_contnos[k],Scalar(0));
+				drawContours(mask,backgrnd_contours,backgrnd_contnos[k],Scalar(0),CV_FILLED);
+				for(int j = 0; j < backgrnd_contours[backgrnd_contnos[k]].size(); j++){
+					if(boundrect.contains(backgrnd_contours[backgrnd_contnos[k]][j])){
+						//if(pointPolygonTest(backgrnd_contours[backgrnd_contnos[k]],Point(boundrect.x,boundrect.y),1) > pointPolygonTest(backgrnd_contours[backgrnd_contnos[k]],Point(boundrect.x+boundrect.width,boundrect.y),1)
+						qDebug("Boundary Reached");
+						//boundrect = rott_rect.boundingRect();
+					}}}
+			if(backgrnd_contnos.size()){
+			//bitwise_not(mask,mask);
+			frame.copyTo(temp,mask);}
+			else
+				frame.copyTo(temp);
+			buff = temp(boundrect);
 		//	if(or_size == 120){
 				//thresh = 40; thresh_type = 1;}
-			int max_thresh = 255;
-			if(!check && loopcount > 0 && cv::Mat(frame).at<uchar>(Point(COM)) < cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2)))
+			imshow("Background Boundary Removal",temp);
+			imshow("Check mask",mask);
+			max_thresh = 255;
+			if(!check && (cv::Mat(frame).at<uchar>(Point(COM)) < cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2)) && cv::Mat(frame).at<uchar>(Point(COM)) < cv::Mat(frame).at<uchar>(Point(boundrect.x - boundrect.width / 4, boundrect.y + boundrect.height / 2))))
 			{thresh = (cv::Mat(frame).at<uchar>(Point(COM)) + cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width + 30, boundrect.y + boundrect.height / 2))) / 2;thresh_type = 1;}
 			//if(!thresh_type && (cv::Mat(frame).at<uchar>(Point((int)COM.x,(int)COM.y)) < 50))
-			if(!check && loopcount > 0 && cv::Mat(frame).at<uchar>(Point(COM)) > cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2)))
-			{max_thresh = 255; thresh_type = 0;
-			//if(cv::Mat(frame).at<uchar>(Point(COM)) - cv::Mat(frame).at<uchar>(Point(COM.x - sqrt(robot_area) / 2.5, COM.y)) < thresh)
-				thresh = (cv::Mat(frame).at<uchar>(Point(COM)) + cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))) / 2;
-			}//else
-				//thresh = (cv::Mat(frame).at<uchar>(Point(COM.x - sqrt(robot_area) / 2.5, COM.y)) + cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))) / 2;}
-			qDebug()<<"COM Pixel "<<cv::Mat(frame).at<uchar>(Point(COM)) << " Difference : "<< cv::Mat(frame).at<uchar>(Point(COM)) - cv::Mat(frame).at<uchar>(Point(COM.x - sqrt(robot_area) / 2.5, COM.y)) <<" Outside Pixel value : "<<cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2));
+			if(!check && cv::Mat(frame).at<uchar>(Point(COM)) > cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2)) && cv::Mat(frame).at<uchar>(Point(COM)) > cv::Mat(frame).at<uchar>(Point(boundrect.x - boundrect.width /4, boundrect.y + boundrect.height / 2)))
+			{max_thresh = ui->threshmax_le->text().toInt(); thresh_type = 0; thresh = cv::Mat(frame).at<uchar>(Point(COM)) - cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))/ 2;
+			if(angleprev < 30 || angleprev > 150)
+				factorx = 3.75;
+			else if(angleprev < 45 || angleprev > 135)
+				factorx = 6.5;
+			else if(angleprev > 45 && angleprev < 135)
+				factory = 5.5;
+			else if (angleprev > 60 && angleprev < 120)
+				factory = 3;
+				pixdiffx = cv::Mat(frame).at<uchar>(Point(COM)) - cv::Mat(frame).at<uchar>(Point(COM.x - sqrt(robot_area) / factorx, COM.y));
+				pixdiffy = cv::Mat(frame).at<uchar>(Point(COM)) - cv::Mat(frame).at<uchar>(Point(COM.x, COM.y - sqrt(robot_area) / factory));
+			//if((cv::Mat(frame).at<uchar>(Point(COM)) - cv::Mat(frame).at<uchar>(Point(COM.x - sqrt(robot_area) / factorx, COM.y)) < thresh / 2 && (angleprev < 45 || angleprev > 135)) || (cv::Mat(frame).at<uchar>(Point(COM)) - cv::Mat(frame).at<uchar>(Point(COM.x, COM.y - sqrt(robot_area) / factory)) < thresh / 2 && (angleprev >= 45 && angleprev <=135)))
+				thresh = (0.8* cv::Mat(frame).at<uchar>(Point(COM)) + 0.2 * cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))) / 2;
+			//else if(pixdiffx > thresh / 2 && (angleprev < 45 || angleprev > 135))
+				//thresh = (cv::Mat(frame).at<uchar>(Point(COM.x - sqrt(robot_area) / factorx, COM.y)) + cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))) / 2;
+			//else if(pixdiffy > thresh / 2 && angleprev > 45 && angleprev < 135)
+				//thresh = (cv::Mat(frame).at<uchar>(Point(COM.x, COM.y - sqrt(robot_area) / factory)) + cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))) / 2;
+			}
+			qDebug()<<"COM Pixel "<<cv::Mat(frame).at<uchar>(Point(COM)) << " Difference : "<< pixdiffx << " " << pixdiffy<<" Outside Pixel value : "<<cv::Mat(frame).at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2));
 			cvDrawCircle(im,Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2),3,Scalar::all(255),1);
 			 //thresh = cv::Mat(frame1).at<uchar>(Point(COM))- 5;
-			if(check == 1)
-				thresh = thresh - 5;
+			if(check == 1 && !thresh_type){
+				if(maxCarea < robot_area / 1.35)
+					thresh = int(0.8 * thresh) ;
+				else
+					thresh = int(1.3 * thresh);
+			}
 			qDebug()<<"Thresh "<<thresh<<" Max Thresh : "<< max_thresh << " Check :"<<check;
-			cv::threshold(buff,buff,20,255,0);
+			cv::threshold(buff,buff,thresh,max_thresh,thresh_type);
 			temp.copyTo(boundcn);
 			//ui->camwn_label->setText(QString::number(thresh_type));
 			//cv::threshold(boundcn,boundcn,thresh,max_thresh,thresh_type);6
 			rectangle(boundcn,boundrect,Scalar::all(255),1);
-			if(loopcount == 1)
+			//if(cv::Mat(frame).at<uchar>(Point(COM)) < 200)
 			imshow("Check",boundcn);
 			//if(or_size == 79)
 			//adaptiveThreshold(temp,temp,255,CV_ADAPTIVE_THRESH_MEAN_C,CV_THRESH_BINARY,11,2);
@@ -873,7 +1075,7 @@ void MainWindow::on_trackbt_pushed(){
 			//buff.copyTo(cv::Mat(bound));
 			//Canny(buff,buff,80,255);		
 			//temp.copyTo(boundcn)'
-			printf("Pixel brightness : %d\n",cv::Mat(frame1).at<uchar>(Point(COM)));
+			//printf("Pixel brightness : %d\n",cv::Mat(frame1).at<uchar>(Point(COM)));
 			contours.clear();
 			findContours(buff, contours, hierarchy, CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
 			maxCarea = 0;
@@ -883,6 +1085,13 @@ void MainWindow::on_trackbt_pushed(){
 			if(mt.m00 > maxCarea){
 				maxCarea  = mt.m00;contor = i;}
 			}
+		/*	if(std::abs(sqrt(pow((mt.m10 / mt.m00 *  frame1 -> width / 300) - COM.x , 2) + pow((mt.m01 / mt.m00 *  frame1 -> height / 200) - COM.y , 2)) - sqrt(pow(COM.x - COMprev.x , 2) + pow(COM.y - COMprev.y , 2))) > 10  && check && loopcount > 1 ) 
+			{
+				boundrect = rott_rect.boundingRect();
+				PrevRect = boundrect;
+			}*/
+			//ui->camwn_label->setText("Area : "+QString::number(maxCarea));//rectangle(boundcn,boundrect,Scalar::all(255),1);
+				drawContours(boundcn,contours,contor,Scalar::all(255),1);//imshow("Check",boundcn);
 			mt = cv::moments(contours[contor]);
 			if((mt.m00 < robot_area / 1.2 || robot_area * 1.2 < mt.m00) && check < 1){
 				//goto revert;
@@ -898,13 +1107,13 @@ void MainWindow::on_trackbt_pushed(){
 					printf("Width subtraction : %d\n", int((300 * 300) / im -> width));
 					boundrect.width = boundrect.width - int((20 * 300) / im -> width);
 					boundrect.height = boundrect.height - int(20 *  200/ frame1 -> height);}
-				check++;  PrevRect = boundrect; goto recalc;}check = 0;
+				check++;  	PrevRect = boundrect; goto recalc;	}check = 0;
 				boundcn = Mat::zeros(frame.size(),CV_8U);
 				drawContours(boundcn,contours,contor,Scalar::all(255),1);
 				//if(loopcount <= 1)
 					//ui->camwn_label->setText(QString::number(maxCarea));
 				//if(loopcount == 1){ui->camwn_label->setText("Area : "+QString::number(maxCarea));//rectangle(boundcn,boundrect,Scalar::all(255),1);
-				//imshow("Check",boundcn);}
+			//	imshow("Check",boundcn);}
 			if((maxCarea < robot_area / 1.3 || maxCarea > robot_area * 1.3) && mfeature <= 3)
 					goto revert;
 			boundcn = Mat::zeros(frame.size(),CV_8U);
@@ -929,17 +1138,18 @@ void MainWindow::on_trackbt_pushed(){
 		angle = calculate_angle(rotrect,rott_rect);
 		boundrect.x += PrevRect.x;
 		boundrect.y += PrevRect.y;
-		if((std::abs(angleprev - angle) != 180) && (angle < angleprev / 1.5 || angle > angleprev * 1.5) && mfeature <= 3){printf("Angle curr Angle prev : %f %f\n",angle,angleprev);
+		if(!((std::abs(angleprev - angle) > 170 && std::abs(angleprev - angle) <= 180)) && (angle < angleprev / 1.5 || angle > angleprev * 1.5) && mfeature <= 3){printf("Angle curr Angle prev : %f %f\n",angle,angleprev);
 			goto revert;}
 		printf("Angle: %f\n",calculate_angle(rotrect,rott_rect));
 		COM.x = mt.m10/mt.m00; COM.y = mt.m01/mt.m00;
 		COM.x += PrevRect.x; COM.y += PrevRect.y;
 		//boundcn = Mat::zeros(frame.size(),CV_8U);
 		//cvDrawCircle(&IplImage(boundcn),Point(COM.x,COM.y),5,Scalar::all(255),1);	
-		PrevRect = boundrect;
-		mfeature = 0;
 		COM.x = (COM.x *  frame1 -> width) / 300;
 		COM.y = (COM.y * frame1 -> height) / 200;
+		COMprev = COM;
+		mfeature = 0;
+		PrevRect = boundrect;
 		//if(maxC_area == 3772.5)
 			//thresh_type;
 		//printf("Pixel Values : %d\n",int(frame.at<uchar>(COM)));
@@ -988,19 +1198,28 @@ printpos :
 		//cvPutText(im,pos.c_str(),org,&font, cv::Scalar(255,255,255));
 
 next:
-		ui->label_25->setText("Robot Area : "+QString::number(robot_area));
+		//ui->tracksett_gb->setText("Robot Area : "+QString::number(robot_area));
 		//ui->camwn_label->setText(QString("Thresh Type : ")+QString::number(thresh_type));
 		//thresh_type = 0;
 		String info = pos.substr(12);
 		info += std::string(int(filename.find("tation") - info.find(")")),' ') + std::to_string(long double(calculate_angle(rotrect,rott_rect)));
 		info += std::string(int(filename.find("me No.")) - info.size() ,' ') + std::to_string(long double(loopcount + 1)) + "\n";
 		fwrite(info.c_str(),sizeof(char), info.size(),fp); 
-		cvDrawCircle(im,Point(COM),3,Scalar::all(255),1);
+		cvDrawCircle(im,Point(COM),5,Scalar(255,0,255),1);
 		cvDrawCircle(im,Point(boundrect.x + boundrect.width + 20,boundrect.y + boundrect.height / 2),4,Scalar::all(255),1);
-		if(loopcount == 0)
+		if(loopcount == 5)
 		imshow("Good Matches", cv::Mat(im));//break;
-		key = waitKey(30);
+		key = waitKey(10);
 		cv::resize(cv::Mat(im),temp,Size(ui->Video_wn->width(),ui->Video_wn->height()));
+		if(clicks && clicks <= 4 && ui->setwaypts_cb->isChecked()){
+			cvInitFont(&font,CV_FONT_HERSHEY_PLAIN,1.0,1.0);
+			for(int k = 0; k < clicks; k++)
+			{
+				cvDrawCircle(&IplImage(temp),waypoints[k],3,Scalar(180,180,0),1);
+				point = string("Waypoint") + std::to_string(long double(k + 1));
+				cvPutText(&IplImage(temp),point.c_str(),Point(waypoints[k].x + 3, waypoints[k].y + 3),&font,Scalar::all(180));
+			}
+		}
 		Qim = Mat2QImage(temp, Qim);
 		this->scene->addPixmap(QPixmap::fromImage(*Qim));
 	//	delete &temp;
@@ -1012,6 +1231,8 @@ next:
 			ui->camwn_label->setText("Frame processing rate"+QString::number(difftime(end,start)));}
 	cvReleaseImage(&im); //cvReleaseImage(&frameprev); cvReleaseImage(&frame1);
 	}
+	cvReleaseImage(&frameprev);
+	cvReleaseImage(&frame1);
 	fclose(fp);
 	delete detector;
     return;
@@ -1297,25 +1518,25 @@ void MainWindow::on_coilcontrol_automatic_pushed(){
 }
 
 void MainWindow::on_learnwaypts_pb_pushed(){
-	if(ui->setwaypts_cb->isChecked())
+	if(ui->setwaypts_cb->isChecked()){
 		ui->autowaypts_pb->setEnabled(true);
-	else
-		ui->autowaypts_pb->setEnabled(false);
+		ui->nextwaypt_pb->setEnabled(true);}
+	else{
+		ui->nextwaypt_pb->setEnabled(false);
+		ui->autowaypts_pb->setEnabled(false);}
 	return;
 }
 
-void MainWindow::on_autowayptspath_pb_pushed(){
+/*void MainWindow::on_autowayptspath_pb_pushed(){
 	if(ui->track_cb->isChecked())
 	{
-		COM.x = ui->pos_COMx->text().toInt();
-		COM.y = ui->pos_COMy->text().toInt();
 		if(clicks == 4)
 		{
 			int tolerance = 10;
 			BYTE * data_command;
 			BYTE data_comm[7];
 			for(int l = 0; l < 4; l++){
-				while(sqrt(pow(std::abs(COM.x - waypoints[l].x),2.0) + pow(std::abs(COM.y - waypoints[l].y),2.0)) > tolerance)
+				while(sqrt(pow(std::abs(COM.x - waypoints[l].x),2) + pow(std::abs(COM.y - waypoints[l].y),2)) > tolerance)
 					{
 						//data_command = determine_command(COM,waypoints,l);
 						send_serialportcommand(determine_command(COM,waypoints,l));
@@ -1323,7 +1544,7 @@ void MainWindow::on_autowayptspath_pb_pushed(){
 			}}}
 	}
 
-BYTE *  MainWindow::determine_command(Point COM, Point * waypts, int waypt_no){
+BYTE *  MainWindow::determine_command(Point COM, Point2f * waypts, int waypt_no){
 	BYTE * command = (BYTE *)malloc(sizeof(BYTE) * 4);
 	if(COM.x - waypts[waypt_no].x > 5)
 		command[5] = 0x22;
@@ -1335,7 +1556,7 @@ BYTE *  MainWindow::determine_command(Point COM, Point * waypts, int waypt_no){
 		command[0] = 0x22;
 	command[2]=command[3]=command[6] = 0x00;
 	return command;
-}
+}*/
 
 
 void MainWindow::on_closeapplication_pushed()
