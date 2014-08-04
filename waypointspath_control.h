@@ -40,7 +40,7 @@ public :
 	double prevdist, prevangle, xdist, ydist;
 	bool juggle, ycontrol, xcontrol;
 	char motiondir[2];
-	Point COMprev;
+	Point2f COMprev, COM;
 	BYTE data_command[7], start_command, command, command_x, command_y;
 	MainWindow * w;
 	DWORD toBeWritten;

@@ -66,25 +66,25 @@ void Thread_manualcontrol::on_coilcontrol(){
 	//if(first_press)
 		//CloseHandle(serialHandle);
 	w->serialHandle = CreateFile(comport, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-	//if(serialHandle == INVALID_HANDLE_VALUE)
-		//ui->camwn_label->setText("Error: Invalid Handle Value for Device 1."); 
+	if(w->serialHandle == INVALID_HANDLE_VALUE)
+		qDebug("Error: Invalid Handle Value for Device 1."); 
+// Do some basic settings
 	DCB serialParams = { 0 };
-	COMMTIMEOUTS timeout = { 0 };
 	serialParams.DCBlength = sizeof(serialParams);
-
 	GetCommState(w->serialHandle, &serialParams);
 	serialParams.BaudRate = 9600;
 	serialParams.ByteSize = 8;
 	serialParams.StopBits = ONESTOPBIT;
 	serialParams.Parity = PARITY_NONE;
-	GetCommState(w->serialHandle, &serialParams);
+	SetCommState(w->serialHandle, &serialParams);
 
+// Set timeouts
+	COMMTIMEOUTS timeout = { 0 };
 	timeout.ReadIntervalTimeout = 50;
-	timeout.ReadTotalTimeoutConstant = 50;
+	timeout.ReadTotalTimeoutConstant = 50;	
 	timeout.ReadTotalTimeoutMultiplier = 50;
 	timeout.WriteTotalTimeoutConstant = 50;
 	timeout.WriteTotalTimeoutMultiplier = 10;
-	SetCommTimeouts(w->serialHandle, &timeout);
 	DWORD toBeWritten = 7, toBeRead = 7;
 	DWORD* written = (DWORD*)malloc(sizeof(DWORD));
 	DWORD* read = (DWORD*)malloc(sizeof(DWORD));

@@ -40,10 +40,10 @@ class MainWindow : public QMainWindow
     Q_OBJECT
     
 public:
-	int selectObject, loopcount, first_press, trackObject, fauto_press, value, clicks, backgrnd_clicks, time_duration, mfeature, thresh, max_thresh, thresh_type, contour, pixdiffx, pixdiffy;
-	Mat image, object, temp, lbutton_up, waypts_sans, tmplate, gimage, update_tmp;
+	int selectObject, loopcount, first_press, trackObject, fauto_press, value, clicks, backgrnd_clicks, time_duration, mfeature, thresh, max_thresh, thresh_type, contour, pixdiffx, pixdiffy, filename_inc;
+	Mat image, object, temp, lbutton_up, waypts_sans, tmplate, gimage, update_tmp, mask;
 	IplImage * im, * src_img;
-	bool mouseevent_valid, stop_capture;
+	bool mouseevent_valid, stop_capture, processing_status;
 	double factorx, factory;
 	Point2f waypoints[4];
 	BusManager busMgr;
@@ -53,19 +53,20 @@ public:
 	Size img_stream;
 	ImageMetadata metadata;
 	Error error;
+	FILE * fp;
 	Camera cam;
 	QImage * Qim;
 	QMutex mutex;
 	QSignalMapper * mapper;
-	QGraphicsScene * scene;
+	QGraphicsScene * scene, * scene_bckgrndsans, * scene_bckgrnd, * scene_template, *scene_mask;
 	QVBoxLayout * scroll_layout;
 	CvCapture * cap;
 	Rect selection, boundrect, PrevRect, backgrndptsrect;
-	string point;
+	string point, filename;
 	CvFont font;
 	double angleprev, angle;
 	Moments mm;
-	std::vector<std::vector<Point>> contours, backgrnd_contours;
+	std::vector<std::vector<Point>> contours, backgrnd_contours, orgim_bckgrndcont;
 	std::vector<int> backgrnd_contnos;
 	//CvSeq *backgrnd_contours;
 	CvSeq * backgrnd_approx;
@@ -116,6 +117,8 @@ public slots:
 	void get_coilcommand(QString);
 	void on_getpixelval_cb_clicked();
 	void on_backgrndpts_cb_clicked();
+	void filesettings(QString);
+	void open_helpwindow();
 
 private:
 	Ui::MainWindow *ui; 
