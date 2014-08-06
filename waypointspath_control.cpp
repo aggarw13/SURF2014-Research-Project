@@ -208,7 +208,8 @@ changecoil:
 			data_command[5] = start_command;}
 			else goto juggle_y;
 		}
-		}
+		coilchange_track++;
+	}
 	//ydist = std::abs(w->COM.y - w->waypoints[waypt_no].y);
 	/*if(data_command[2] == data_command[3] && !juggle){
 		if(motiondir[1] == 'U')

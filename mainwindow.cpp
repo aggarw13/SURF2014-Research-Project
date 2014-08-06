@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "help_window.h"
 #include "thread_manualcontrol.h"
 #include "waypointspath_control.h"
 #include <ui_mainwindow.h>
@@ -54,8 +55,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->backgrndsans_wn->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	ui->mask_wn->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	ui->mask_wn->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	//ui->Video_wn->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	//ui->Video_wn->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	ui->Video_wn->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	ui->Video_wn->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	//delete ui->template_wn->horizontalScrollBar();
 	if(!image.data)
 		backgrnd_pts = NULL;
@@ -63,7 +64,8 @@ MainWindow::MainWindow(QWidget *parent) :
 		delete backgrnd_pts;
 	backgrnd_pts = (Point *)malloc(sizeof(Point) * ui->backgrndclicks_label->text().toInt());
 	Qim = NULL;
-	factorx = 3; factory = 2.75;
+	factorx = 0.4; factory = 0.4;
+	help_wn = new Help_window(0);
 	m_threadDoneEvent = CreateEvent( NULL, FALSE, FALSE, NULL );
 	//ui->scrollArea->addScrollBarWidget(ui->scrollArea,Qt::Alignment
 	//ui->Video_wn->setMouseTracking(true);
@@ -86,13 +88,9 @@ MainWindow::MainWindow(QWidget *parent) :
 	thread_control = (void *)thread;
 	waypointspath_control * waypoints_thread = new waypointspath_control(0, this);
 	wayptspath_thread = (void *)waypoints_thread;
-	//thread->moveToThread(thread);
 	mapper = new QSignalMapper();
 	QSignalMapper * threadmap = new QSignalMapper();
 	QSignalMapper * filesett_map = new QSignalMapper(this);
-	//mapper->moveToThread(thread);
-	//ui->leftc_pb->moveToThread(thread);
-	//QObject::connect(ui->leftc_pb,SIGNAL(clicked()), thread, SLOT(start()));
 	mapper->setMapping(ui->leftc_pb,QString("L"));
 	mapper->setMapping(ui->rightc_pb,QString("R"));
 	mapper->setMapping(ui->bottomc_pb,QString("B"));
@@ -116,14 +114,6 @@ MainWindow::MainWindow(QWidget *parent) :
 	QObject::connect(mapper,SIGNAL(mapped(QString)),this,SLOT(get_coilcommand(QString)));
 	//QObject::connect(mapper,SIGNAL(mapped(QString)), thread, SLOT(start()), Qt::QueuedConnection);
 	QObject::connect(mapper,SIGNAL(mapped(QString)),this,SLOT(thread_started(QString)));
-	//QObject::connect(mapper,SIGNAL(mapped(QString)),thread,SLOT(on_coilcontrol_manual_pushed(QString)), Qt::QueuedConnection);
-	//QObject::connect(mapper,SIGNAL(mapped(QString)),thread,SLOT(on_coilcontrol()), Qt::QueuedConnection);
-	//QObject::connect(thread,SIGNAL(manual_finished()),ui->errorlog_label, SLOT(setText("Threading check")), Qt::QueuedConnection);
-	//QObject::connect(mapper,SIGNAL(mapped(QString)),this,SLOT(on_coilcontrol_manual_pushed(QString)));
-	//QObject::connect(thread,SIGNAL(manual_finished()),thread,SLOT(quit()));
-	//thread->start();
-	//ui->errorlog_label->setText("Thread Status : " + QString::number(thread->isRunning()));
-	//thread->quit();
 	thread->wait();
 	scene_bckgrnd = new QGraphicsScene(this);
 	scene_bckgrndsans = new QGraphicsScene(this);
@@ -160,16 +150,9 @@ MainWindow::MainWindow(QWidget *parent) :
 	streamlist.clear();*/
 	streamlist = QStringList() << QString("0") << QString("1");
 	ui->threshtype_dd->addItems(streamlist);
-	cvSetMouseCallback("Test", mouseHandler , this );
+	//cvSetMouseCallback("Test", mouseHandler , this );
 	for(int i = 0; i < 7; i++)
 	{datasend[i] = 0x00; prevsent[i] = 0x00;}
-	CString comport = "\\\\.\\COM4";
-	//serialHandle = CreateFile(comport, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-	if(serialHandle == INVALID_HANDLE_VALUE)
-		ui->errorlog_label->setText("Error: Invalid Handle Value for Device 1."); 
-// Do some basic settings
-	//serialParams = {0};
-	//on_capture_pb_pushed();
 }
 
 void MainWindow::thread_started(QString coil){
@@ -195,7 +178,7 @@ void MainWindow::thread_started(QString coil){
 		qDebug() << "Conversion factor : " << wthread->conv_factor[0] << " Window width : " << image.cols;
 		wthread->start();
 		ui->track_cb->setChecked(true);
-		on_trackbt_pushed();
+		ui->track_cb->clicked(true);
 		//emit ui->track_cb->clicked(true);
 		//ui->track_cb->clicked(true);
 	}
@@ -212,11 +195,11 @@ void MainWindow::filesettings(QString filetype)
 			ui->autoincrmnt_cb->setChecked(false);}}
 
 void MainWindow::on_Capturepb_pushed(){
-	//if(action.toStdString().c_str()[0] == 'E')
-		//return;
    stop_capture = false;
+	if(ui->track_cb->isChecked())
+		return;
 	//cv::VideoWriter output_video; 
-	CvVideoWriter * output_video;
+	//CvVideoWriter * output_video;
 	if(ui->stream_filemenu->currentIndex() > 1){
 	cap = cvCaptureFromAVI(ui->stream_filemenu->currentText().toLocal8Bit().data());
 	image = cvQueryFrame(cap);}
@@ -240,16 +223,18 @@ void MainWindow::on_Capturepb_pushed(){
 	default : fps = FRAMERATE_15;
 	}
 	switch(ui->Videomode_dd->currentIndex()){
-	case 1: vd = VIDEOMODE_640x480Y8; src_img = cvCreateImage(cvSize(480,640),IPL_DEPTH_8U,1); break;
-	case 2: vd = VIDEOMODE_640x480Y16; src_img = cvCreateImage(cvSize(480,640),IPL_DEPTH_16U,1); break;
-	case 4: vd = VIDEOMODE_1280x960Y8; src_img = cvCreateImage(cvSize(960,1280),IPL_DEPTH_8U,1); break;
-	case 5: vd = VIDEOMODE_1280x960Y16; src_img = cvCreateImage(cvSize(960,1280),IPL_DEPTH_16U,1); break;
-	case 6: vd = VIDEOMODE_1280x960RGB; src_img = cvCreateImage(cvSize(960,1280),IPL_DEPTH_8U,3); break;
-	default : vd = VIDEOMODE_1280x960RGB; src_img = cvCreateImage(cvSize(960,1280),IPL_DEPTH_8U,3); 
+	case 1: vd = VIDEOMODE_640x480Y8; src_img = cvCreateImage(cvSize(640,480),IPL_DEPTH_8U,1); break;
+	case 2: vd = VIDEOMODE_640x480Y16; src_img = cvCreateImage(cvSize(650,480),IPL_DEPTH_16U,1); break;
+	case 4: vd = VIDEOMODE_1280x960Y8; src_img = cvCreateImage(cvSize(1280,960),IPL_DEPTH_8U,1); break;
+	case 5: vd = VIDEOMODE_1280x960Y16; src_img = cvCreateImage(cvSize(1280,960),IPL_DEPTH_16U,1); break;
+	case 6: vd = VIDEOMODE_1280x960RGB; src_img = cvCreateImage(cvSize(1280,960),IPL_DEPTH_8U,3); break;
+	default : vd = VIDEOMODE_1280x960RGB; src_img = cvCreateImage(cvSize(1280,960),IPL_DEPTH_8U,3); 
 	}
 	cam.SetVideoModeAndFrameRate(vd,fps);
-	output_video = cvCreateVideoWriter("Video_output.wmv",CV_FOURCC('W','M','V','2'),30,Size(960,1280),1);
-	//output_video = VideoWriter("Video_output.avi",CV_FOURCC('W','M','V','3'),30, Size(960,1280),true);
+	if(ui->videofile_cb->isChecked()){
+		filename = ui->videofilename_le->text().toStdString() + ".wmv";
+		output_video = cvCreateVideoWriter(filename.c_str(),CV_FOURCC('D','I','V','3'),30,Size(1280,960),1);}
+	//output_video = VideoWriter("Video_output.wmv",CV_FOURCC('D','I','V','3'),30,Size(src_img->width,src_img->height),true);
 	/*(cv::VideoWriter output_cap("Video_output.wmv",1,cap.get(CV_CAP_PROP_FPS),
                cv::Size(cap.get(CV_CAP_PROP_FRAME_WIDTH),
                cap.get(CV_CAP_PROP_FRAME_HEIGHT)));*/
@@ -289,9 +274,11 @@ void MainWindow::on_Capturepb_pushed(){
 		memcpy(src_img->imageData, static_cast<uchar *>(convertedimage.GetData()), convertedimage.GetDataSize());
 		if(loopcount == 0)
 			img_stream = Size(src_img->width,src_img->height);
-		cvWriteFrame(output_video,src_img);
+		//cvWriteFrame(output_video,src_img);
+		//cvWriteToAVI(output_video,src_img);
 		cv::resize(cv::Mat(src_img),temp,Size(ui->Video_wn->width(),ui->Video_wn->height()));
 		//output_video.write(cv::Mat(src_img));
+		//qDebug("Streamed Image Size : (%d,%d) ",src_img->width,src_img->height);
 		temp.copyTo(image);
 		if(clicks && clicks <= ui->wayptsno_le->text().toInt() && ui->setwaypts_cb->isChecked()){
 			cvInitFont(&font,CV_FONT_HERSHEY_PLAIN,1.0,1.0);
@@ -336,21 +323,13 @@ void MainWindow::on_Capturepb_pushed(){
 				break;
 		}
 		loopcount++;
-		//output_video.write(image);
-		//cam.Disconnect();}
-		//if(src_img->imageData != NULL)
-		//	free(src_img->imageData);
-		//if(src_img->imageDataOrigin != NULL)
-			//free(src_img->imageDataOrigin);
-		//if(src_img->imageId != NULL)
-			//free(src_img->imageId);
 		free(src_img->roi);
 		free(src_img->tileInfo);
 		cvReleaseData(src_img);
 		cvReleaseImage(&src_img);
 	}
 	//error = cam.Disconnect();
-	cvReleaseVideoWriter(&output_video);
+	//cvReleaseVideoWriter(&output_video);
 	if(ui->stream_filemenu->currentIndex() == 1){
 	if(error != PGRERROR_OK)
 		ui->errorlog_label->setText(QString::fromStdString(error.GetDescription()));}
@@ -414,9 +393,9 @@ double MainWindow::calculate_angle(Point2f* points,RotatedRect rotrect)
 
 void MainWindow::mousePressEvent(QMouseEvent * ev){
 	mouseevent_valid = false;
-	if(ev->x() < ui->Video_wn->x() - 1|| ev->x() > ui->Video_wn->x() + ui->Video_wn->width())
+	if(ev->x() < ui->Video_wn->x() + 20 || ev->x() > ui->Video_wn->x() + ui->Video_wn->width() + 20)
 		return;
-	if(ev->y() < ui->Video_wn->y() || ev->y() > ui->Video_wn->y() + ui->Video_wn->height())
+	if(ev->y() < ui->Video_wn->y() + 63 || ev->y() > ui->Video_wn->y() + ui->Video_wn->height() + 63)
 		return;
 	if(!ui->stream_filemenu->currentIndex() > 0)
 		return;
@@ -428,10 +407,10 @@ void MainWindow::mousePressEvent(QMouseEvent * ev){
 	image.copyTo(lbutton_up);
 	//if(ev->flags() == MOUSEEVENTF_LEFTDOWN
 	if(ev->button() == Qt::LeftButton && !ui->setwaypts_cb->isChecked() && !ui->backgrndpts_cb->isChecked()){
-		origin = Point(ev->x() - ui->Video_wn->x() - 13 ,ev->y() - ui->Video_wn->y() - 55);
-        selection = Rect(ev->x() - ui->Video_wn->x() - 13 ,ev->y() - ui->Video_wn->y() - 55,0,0);
+		origin = Point(ev->x() - ui->Video_wn->x() -  20 ,ev->y() - ui->Video_wn->y() - 63);
+        selection = Rect(ev->x() - ui->Video_wn->x() -  20 ,ev->y() - ui->Video_wn->y() - 63,0,0);
 		//ui->errorlog_label->setText(QString::number(ev->x() - ui->Video_wn->x())+QString(",")+QString::number(ev->y() - ui->Video_wn->y()));
-		//cvDrawCircle(&IplImage(image),Point(ui->Video_wn->x() - 13 ,ui->Video_wn->y() - 55),3,Scalar::all(255),1);
+		//cvDrawCircle(&IplImage(image),Point(ui->Video_wn->x() -  20 ,ui->Video_wn->y() - 63),3,Scalar::all(255),1);
 		Qim = Mat2QImage(image, Qim);
 		scene->addPixmap(QPixmap::fromImage(*Qim));
 		image.copyTo(temp);
@@ -439,39 +418,39 @@ void MainWindow::mousePressEvent(QMouseEvent * ev){
 }
 }
 void MainWindow::mouseMoveEvent(QMouseEvent * ev){
-	if(!mouseevent_valid || ui->backgrndpts_cb->isChecked())
+	if(!mouseevent_valid || ui->backgrndpts_cb->isChecked() || ui->track_cb->isChecked() || !image.data)
 		return;
 	if(image.data){
 	cv::resize(cv::Mat(image),temp,Size(ui->Video_wn->width(),ui->Video_wn->height()));
 	temp.copyTo(image);
 	image.copyTo(temp);
 	if(selectObject){
-		//line(image,origin,Point(ev->x()-ui->Video_wn->x() - 13 ,origin.y),Scalar(255,0,0),1);
-		//line(image,Point(ev->x()-ui->Video_wn->x() - 13 ,ev->y()-ui->Video_wn->y() - 55),Point(ev->x()-ui->Video_wn->x() - 13 ,origin.y),Scalar(255,0,0),1);
-		//line(image,Point(ev->x()-ui->Video_wn->x() - 13 ,ev->y()-ui->Video_wn->y() - 55),Point(origin.x,ev->y()-ui->Video_wn->y() - 55),Scalar(255,0,0),1);
-		//line(image,Point(origin.x,ev->y()-ui->Video_wn->y() - 55),origin,Scalar(255,0,0),1);
-		/*if(ev->x() > ui->Video_wn->x() + ui->Video_wn->width() + 13)
-			 ev->= ui->Video_wn->x() + ui->Video_wn->width() + 13;
-		if(ev->y() > ui->Video_wn->y() + ui->Video_wn->height() + 55)
-		ev->y() = ui->Video_wn->y() + ui->Video_wn->height() + 55;*/
-	if(ev->x() < ui->Video_wn->x() - 1){
+		//line(image,origin,Point(ev->x()-ui->Video_wn->x() -  20 ,origin.y),Scalar(255,0,0),1);
+		//line(image,Point(ev->x()-ui->Video_wn->x() -  20 ,ev->y()-ui->Video_wn->y() - 63),Point(ev->x()-ui->Video_wn->x() -  20 ,origin.y),Scalar(255,0,0),1);
+		//line(image,Point(ev->x()-ui->Video_wn->x() -  20 ,ev->y()-ui->Video_wn->y() - 63),Point(origin.x,ev->y()-ui->Video_wn->y() - 63),Scalar(255,0,0),1);
+		//line(image,Point(origin.x,ev->y()-ui->Video_wn->y() - 63),origin,Scalar(255,0,0),1);
+		/*if(ev->x() > ui->Video_wn->x() + ui->Video_wn->width() +  20)
+			 ev->= ui->Video_wn->x() + ui->Video_wn->width() +  20;
+		if(ev->y() > ui->Video_wn->y() + ui->Video_wn->height() + 63)
+		ev->y() = ui->Video_wn->y() + ui->Video_wn->height() + 63;*/
+	if(ev->x() < ui->Video_wn->x() + 17){
 		selection.x = 0;
 		selection.width = origin.x;}
-	else if(ev->x() > ui->Video_wn->x() + ui->Video_wn->width()){
+	else if(ev->x() > ui->Video_wn->x() + image.cols + 20){
 		selection.x = origin.x;
-		selection.width = std::abs(origin.x - ui->Video_wn->width());}
+		selection.width = std::abs(origin.x - image.cols);}
 	else{
-		selection.x = MIN(ev->x()-ui->Video_wn->x() - 13 , origin.x);
-		selection.width = std::abs(ev->x()-ui->Video_wn->x() - 13 - origin.x);}
-	if(ev->y() < ui->Video_wn->y()){
+		selection.x = MIN(ev->x()-ui->Video_wn->x() -  20 , origin.x);
+		selection.width = std::abs(ev->x()-ui->Video_wn->x() -  20 - origin.x);}
+	if(ev->y() < ui->Video_wn->y() + 63){
 		selection.y = 0;
 		selection.height = origin.y;}
-	else if(ev->y() > ui->Video_wn->y() + ui->Video_wn->height()){
+	else if(ev->y() > ui->Video_wn->y() + image.rows + 63){
 		selection.y = origin.y;
-		selection.height = ui->Video_wn->height() - origin.y;}
+		selection.height = image.rows - origin.y;}
 	else{
-        selection.y = MIN(ev->y()-ui->Video_wn->y() - 55, origin.y);
-		selection.height = std::abs(ev->y()-ui->Video_wn->y() - 55 - origin.y);}
+        selection.y = MIN(ev->y()-ui->Video_wn->y() - 63, origin.y);
+		selection.height = std::abs(ev->y()-ui->Video_wn->y() - 63 - origin.y);}
 		rectangle(image,selection,Scalar(255,0,0),1);
 		Qim = Mat2QImage(image, Qim);
 		scene->clear();
@@ -482,11 +461,11 @@ void MainWindow::mouseMoveEvent(QMouseEvent * ev){
 }
 }
 void MainWindow::mouseReleaseEvent(QMouseEvent *ev){
-	if(!mouseevent_valid)
+	if(!mouseevent_valid || ui->track_cb->isChecked())
 		return;
-	if(ev->x() < ui->Video_wn->x() || ev->x() > ui->Video_wn->x() + ui->Video_wn->width())
+	if(ev->x() < ui->Video_wn->x() + 17 || ev->x() > ui->Video_wn->x() + ui->Video_wn->width() + 17)
 		return;
-	if(ev->y() < ui->Video_wn->y() || ev->y() > ui->Video_wn->y() + ui->Video_wn->height())
+	if(ev->y() < ui->Video_wn->y() + 63 || ev->y() > ui->Video_wn->y() + ui->Video_wn->height() + 63)
 		return;
 	if(image.data){
 	cv::resize(cv::Mat(image),temp,Size(ui->Video_wn->width(),ui->Video_wn->height()));
@@ -495,16 +474,16 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *ev){
 	if(ui->backgrndpts_cb->isChecked()){
 		backgrnd_clicks++;
 		if(backgrnd_clicks <= ui->backgrndno_le->text().toInt()){
-			pixelcheck = Point(ev->x() - ui->Video_wn->x() - 13 ,ev->y() - ui->Video_wn->y() - 55);
-			backgrnd_pts[backgrnd_clicks - 1] = Point(ev->x() - ui->Video_wn->x() - 13 ,ev->y() - ui->Video_wn->y() - 55);}
+			pixelcheck = Point(ev->x() - ui->Video_wn->x() -  20 ,ev->y() - ui->Video_wn->y() - 63);
+			backgrnd_pts[backgrnd_clicks - 1] = Point(ev->x() - ui->Video_wn->x() -  20 ,ev->y() - ui->Video_wn->y() - 63);}
 		else backgrnd_clicks = 0;
 		ui->backgrndclicks_label->setText(QString::number(backgrnd_clicks));
 		releaseMouse();
 		return;
 	}
 	if(ui->pixelval_cb->isChecked() && image.data){
-		pixelcheck = Point(ev->x() - ui->Video_wn->x() - 13 ,ev->y() - ui->Video_wn->y() - 55);
-		cvDrawCircle(&IplImage(image),Point(ev->x() - ui->Video_wn->x() - 13 ,ev->y() - ui->Video_wn->y() - 55),3,Scalar::all(255));
+		pixelcheck = Point(ev->x() - ui->Video_wn->x() - 20 ,ev->y() - ui->Video_wn->y() - 63);
+		cvDrawCircle(&IplImage(image),Point(ev->x() - ui->Video_wn->x() -  20 ,ev->y() - ui->Video_wn->y() - 63),3,Scalar::all(255));
 		cvtColor(image,gimage,CV_BGR2GRAY);
 		ui->pixelvalue->setText(QString::number(gimage.at<uchar>(Point(pixelcheck))));
 	}
@@ -514,7 +493,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *ev){
 			image.copyTo(waypts_sans);
 		clicks++; string point; 
 		if(clicks <= ui->wayptsno_le->text().toInt()){
-			waypoints[clicks - 1] = Point2f(ev->x() - ui->Video_wn->x() - 13 ,ev->y() - ui->Video_wn->y() - 55);
+			waypoints[clicks - 1] = Point2f(ev->x() - ui->Video_wn->x() - 20 ,ev->y() - ui->Video_wn->y() - 63);
 			//for(int k = 0; k < clicks; k++)
 			//{
 				//ui->errorlog_label->setText(QString::number(clicks));
@@ -537,10 +516,10 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *ev){
 	if(image.data){
 	if(ev->button() == Qt::LeftButton && selectObject)
 	{
-		selection.x = MIN(ev->x()- 13 -ui->Video_wn->x() , origin.x);
-        selection.y = MIN(ev->y()- 55 -ui->Video_wn->y(), origin.y);
-        selection.width = std::abs(ev->x() - 13 - ui->Video_wn->x() - origin.x);
-        selection.height = std::abs(ev->y() - 55 -ui->Video_wn->y() - origin.y);
+		selection.x = MIN(ev->x()-  20 -ui->Video_wn->x() , origin.x);
+        selection.y = MIN(ev->y()- 63 -ui->Video_wn->y(), origin.y);
+        selection.width = std::abs(ev->x() -  20 - ui->Video_wn->x() - origin.x);
+        selection.height = std::abs(ev->y() - 63 -ui->Video_wn->y() - origin.y);
 		Qim = Mat2QImage(lbutton_up, Qim);
 		scene->addPixmap(QPixmap::fromImage(*Qim));
 		selectObject = false;
@@ -591,7 +570,7 @@ void MainWindow::keyPressEvent(QKeyEvent * ev){
 
 void MainWindow::nextwaypoint_pb_pushed(){
 	waypointspath_control * wthread = (waypointspath_control *)wayptspath_thread;
-	if(wthread->isRunning() && wthread->wayptno < ui->autowaypts_pb->text().toInt()){
+	if(wthread->isRunning() && wthread->wayptno < ui->wayptsno_le->text().toInt()){
 		this->mutex.lock();
 		wthread->wayptno++;
 		this->mutex.unlock();}
@@ -631,7 +610,6 @@ void MainWindow::learn_backgroundfield(){
 		storage = cvCreateMemStorage(0);
 		//cvFindContours(&IplImage(update_tmp), storage, &backgrnd_contours, sizeof(CvContour), CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE, cvPoint(0,0));
 		temp = Mat::zeros(image.size(), CV_8UC1);
-		//im = cvCreateImage(Size(image.cols,image.rows),CV_8U,1);
 		contour = 0;
 		//if(backgrnd_contours.size())
 			//backgrnd_contours.clear();
@@ -642,12 +620,9 @@ void MainWindow::learn_backgroundfield(){
 			//approxPolyDP(contours[i],backgrnd_contours[i],3,1);
 		//backgrnd_approx = cvApproxPoly(backgrnd_contours,sizeof(CvContour), storage, CV_POLY_APPROX_DP, cvContourPerimeter(backgrnd_contours)*0.02,0);
 		//qDebug() << " approx Poly Contours Size :" << backgrnd_contours.size()<< " CvSeq  Contours Size : " << contours.size();
-		//CvSeq * current = backgrnd_contours;
-		//backgrnd_contours.resize(backgrnd_contours,
 		//for (current = backgrnd_contours; current != NULL; current = current -> h_next)
 		for(int i = 0; i < backgrnd_contours.size(); i++)
 		{
-			//mm = cv::moments(contours[i], false);
 			for(int j = 0; j < ui->backgrndno_le->text().toInt(); j++){
 				//drawContours(temp,backgrnd_contours,i, Scalar::all(255),1);
 			//	ui->errorlog_label->setText(QString::number(cvPointPolygonTest(&Mat(contours[i]),backgrnd_pts[j],1) < 15));
@@ -685,23 +660,12 @@ void MainWindow::learn_backgroundfield(){
 	}}
 
 void MainWindow::on_trackbt_pushed(){
-	/*else{
-	if(ui->stream_filemenu->currentIndex() == 2)
-		object = cvLoadImage("Template_video3.jpg",CV_LOAD_IMAGE_GRAYSCALE);
-	else if(ui->stream_filemenu->currentIndex() == 3)
-		object = cvLoadImage("Template_mr.jpg",CV_LOAD_IMAGE_GRAYSCALE);}*/
-	//namedWindow("Template",CV_WINDOW_AUTOSIZE);
-	//imshow("Template",object);
-   /* if( !object.data)
-    {
-        std::cout<< "Error reading object " << std::endl;
-        return;
-    }*/
 	int key  = 0;
+	if(!image.data){
+		ui->errorlog_label->setText("Invalid Selection! Please set the camera settings and video source");
+		return;}
 	loopcount = 0;
 	cv::BackgroundSubtractorMOG2 bgsub;
-	//object = cvLoadImage("Template_video3.jpg",CV_LOAD_IMAGE_GRAYSCALE);
-	//if(accessui->filename_le->text().toStdString()
 	ifstream fname(ui->filename_le->text().toStdString() + ".txt");
 	if(fname.good() && ui->autoincrmnt_cb->isChecked()){
 		filename_inc++;
@@ -719,7 +683,6 @@ void MainWindow::on_trackbt_pushed(){
 	filename = "Position of COM       Orientation(degrees)        Frame No.\n";
 	fputs(filename.c_str(),fp);}
 	Mat fgmask, segm, roi, buff, fmask, obj_or;object.copyTo(obj_or);
-	//namedWindow("Check");
     //Detect the keypoints using SURF Detector
     int minHessian = ui->featthresh_dd->currentText().toInt();
 	GaussianBlur( object, object, Size(3,3), 0, 0, BORDER_DEFAULT );
@@ -739,7 +702,9 @@ void MainWindow::on_trackbt_pushed(){
 		extractor = new SurfDescriptorExtractor(extract_thresh.toInt()) ;
     Mat des_object, des_img;
 	FlannBasedMatcher matcher;
-	namedWindow("Test");
+	if(ui->videofile_cb->isChecked()){
+		filename = ui->videofilename_le->text().toStdString() + ".wmv";
+		output_video = cvCreateVideoWriter(filename.c_str(),CV_FOURCC('D','I','V','3'),30,img_stream,true);}
 	if(ui->stream_filemenu->currentIndex() > 1)
 		cap = cvCaptureFromAVI(ui->stream_filemenu->currentText().toLocal8Bit().data());	
 	int Key = 0;
@@ -748,8 +713,6 @@ void MainWindow::on_trackbt_pushed(){
 	//	Key = cvWaitKey(30);}
 	//if(im == NULL)
 	//	return;
-	double robot_area = 0.0;
-	Moments mt;
 	 std::vector<KeyPoint> kp_image;
      std::vector<vector<DMatch > > matches;
      std::vector<DMatch > good_matches;
@@ -795,6 +758,7 @@ void MainWindow::on_trackbt_pushed(){
 		cam.Disconnect();
 		cam.Connect(&guid);}*/
 	cam.Connect(&guid);
+	cam.SetVideoModeAndFrameRate(vd,fps);
 	cam.StartCapture();
 	//try{
 	while (key != 27 && ui->track_cb->isChecked() )
@@ -886,7 +850,7 @@ void MainWindow::on_trackbt_pushed(){
 		//GaussianBlur(temp,temp,Size(3,3),0,0,BORDER_DEFAULT);
 		mask = Mat(frame.size(),CV_8UC1,Scalar(255));
 		for(int i = 0; i < orgim_bckgrndcont.size(); i++)
-			drawContours(mask,orgim_bckgrndcont,i,Scalar(0),ui->backgrndtype_dd->currentIndex() / 2 * (-1) + ui->backgrndtype_dd->currentIndex() - 2);
+			drawContours(mask,orgim_bckgrndcont,i,Scalar(0),ui->backgrndtype_dd->currentIndex() / 2 * (2) + ui->backgrndtype_dd->currentIndex() - 2);
 		//cv::resize(lbutton_up,mask,frame.size());
 		//bitwise_not(mask,mask);
 		if(backgrnd_contnos.size())
@@ -911,11 +875,11 @@ void MainWindow::on_trackbt_pushed(){
 			if(mm.m00 > maxC_area){
 				maxC_area  = mm.m00;contour = i;}//}
 		}
-		printf("\nContour no. : %d",contour);
+		//printf("\nContour no. : %d",contour);
 		robot_area = contourArea(contours[contour]);
 		robot_area  = (robot_area * 200 * 300 )/ (im ->width * im->height);
-		printf("\nARea of robot : %f\n",robot_area);
-		namedWindow("Check",WINDOW_AUTOSIZE);
+		//printf("\nARea of robot : %f\n",robot_area);
+		//namedWindow("Check",WINDOW_AUTOSIZE);
 		background = cv::Mat(im);
 		//mask = frame(rectLine);
 		//cvSetImageROI(&IplImage(mask),rectLine);
@@ -925,11 +889,7 @@ void MainWindow::on_trackbt_pushed(){
 		//frame.copyTo(background,mask);
 		boundcn = Mat::zeros(frame.size(),CV_8U);
 		drawContours(boundcn,contours,contour,Scalar::all(255),1);	
-		//imshow("Check",boundcn);
 		roi = cv::Mat(im) - background;
-		//roi.copyTo(mask);
-		//if(loopcount == 1)
-		//robot_area = maxC_area;
 		mt = cv::moments(contours[contour]);
 		COM.x = mt.m10/mt.m00 + boundrect.x; COM.y = mt.m01/mt.m00 + boundrect.y; COMprev = COM;
 		rott_rect = minAreaRect(contours[contour]);
@@ -965,7 +925,6 @@ void MainWindow::on_trackbt_pushed(){
 
 			//rectangle(cv::Mat(im),boundrect,Scalar::all(255),1);
 			if(loopcount > 0){
-				printf("Checking entry\n");
 				if(thresh_type == 0){
 					boundrect.x = boundrect.x - 12 * 300/ frame1 -> width;
 					boundrect.y = boundrect.y - 12 * 200/ frame1 -> height;}
@@ -974,8 +933,10 @@ void MainWindow::on_trackbt_pushed(){
 					boundrect.y = boundrect.y - 20 * 200/ frame1 -> height;}
 				boundrect.height = boundrect.height + int((33 * 300)/ frame1 -> width);
 				boundrect.width = boundrect.width + int((33 * 200) / frame1 -> height);}	
-			
-			PrevRect  = boundrect;
+			if(boundrect.x && boundrect.y && (boundrect.x + boundrect.width <= img_stream.width) && (boundrect.y + boundrect.height <= img_stream.height))
+				PrevRect  = boundrect;
+			else 
+				boundrect = PrevRect;
 			cv::Mat(im).copyTo(segm);
 		//segm = cv::Mat(frameprev);
 			subtract(segm, cv::Mat(frameprev),segm);
@@ -1118,28 +1079,33 @@ void MainWindow::on_trackbt_pushed(){
 			imshow("Background Boundary Removal",temp);
 			imshow("Check mask",mask);
 			max_thresh = 255;
-			if(!check && (temp.at<uchar>(Point(COM)) < temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2)) && temp.at<uchar>(Point(COM)) < temp.at<uchar>(Point(boundrect.x - boundrect.width / 4, boundrect.y + boundrect.height / 2))))
+			if(!check && (temp.at<uchar>(Point(COM)) < temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2)) && temp.at<uchar>(Point(COM)) < temp.at<uchar>(Point(boundrect.x , boundrect.y + boundrect.height / 2))))
 			{thresh = (temp.at<uchar>(Point(COM)) + temp.at<uchar>(Point(boundrect.x + boundrect.width + 30, boundrect.y + boundrect.height / 2))) / 2;thresh_type = 1;}
 			//if(!thresh_type && (temp.at<uchar>(Point((int)COM.x,(int)COM.y)) < 50))
-			if(!check && temp.at<uchar>(Point(COM)) > temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2)) && temp.at<uchar>(Point(COM)) > temp.at<uchar>(Point(boundrect.x - boundrect.width /4, boundrect.y + boundrect.height / 2)))
-			{max_thresh = ui->threshmax_le->text().toInt(); thresh_type = 0; thresh = temp.at<uchar>(Point(COM)) - temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))/ 2;
+			if(!check && temp.at<uchar>(Point(COM)) > temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2)) && temp.at<uchar>(Point(COM)) > temp.at<uchar>(Point(boundrect.x - boundrect.width / 4, boundrect.y + boundrect.height / 2)))
+			{max_thresh = ui->threshmax_le->text().toInt(); thresh_type = 0; thresh = temp.at<uchar>(Point(COM)) - temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2));
 			if(angleprev < 30 || angleprev > 150)
-				factorx = 15;
+				factorx = 0.8;
 			else if(angleprev < 45 || angleprev > 135)
-				factorx = 12.5;
-			else if(angleprev > 45 && angleprev < 135)
-				factory = 12.5;
-			else if (angleprev > 60 && angleprev < 120)
-				factory = 10;
-				pixdiffx = temp.at<uchar>(Point(COM)) - temp.at<uchar>(Point(COM.x - sqrt(robot_area) / factorx, COM.y));
-				pixdiffy = temp.at<uchar>(Point(COM)) - temp.at<uchar>(Point(COM.x, COM.y - sqrt(robot_area) / factory));
-			if((temp.at<uchar>(Point(COM)) - temp.at<uchar>(Point(COM.x - sqrt(robot_area) / factorx, COM.y)) < thresh / 2 && (angleprev < 45 || angleprev > 135)) || (temp.at<uchar>(Point(COM)) - temp.at<uchar>(Point(COM.x, COM.y - sqrt(robot_area) / factory)) < thresh / 2 && (angleprev >= 45 && angleprev <=135)))
+				factorx = 0.6;
+			else if(angleprev > 60 && angleprev < 120)
+				factory = 0.8;
+			else if (angleprev > 45 && angleprev < 135)
+				factory = 0.6;
+				pixdiffx = temp.at<uchar>(Point(COM)) - temp.at<uchar>(Point(COM.x + factorx *sqrt(robot_area) * cos(angleprev * 22 /(7 * 180)), COM.y - factory * sqrt(robot_area) * sin(angleprev * 22 /(7 * 180))));
+				pixdiffy = temp.at<uchar>(Point(COM)) - temp.at<uchar>(Point(COM.x - factorx *sqrt(robot_area) * cos(angleprev * 22 /(7 * 180)), COM.y + factory * sqrt(robot_area) * sin(angleprev * 22 /(7 * 180))));
+			if(pixdiffx < thresh / 2 || pixdiffy < thresh / 2)
 				thresh = (0.8* temp.at<uchar>(Point(COM)) + 0.2 * temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))) / 2;
-			else if(pixdiffx > thresh / 2 && (angleprev < 45 || angleprev > 135))
-				thresh = (temp.at<uchar>(Point(COM.x - sqrt(robot_area) / factorx, COM.y)) + temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))) / 2;
-			else if(pixdiffy > thresh / 2 && angleprev > 45 && angleprev < 135)
-				thresh = (temp.at<uchar>(Point(COM.x, COM.y - sqrt(robot_area) / factory)) + temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))) / 2;
+			else if(pixdiffx > pixdiffy )//&& (angleprev < 45 || angleprev > 135))
+				thresh = (temp.at<uchar>(Point(COM.x + factorx *sqrt(robot_area) * cos(angleprev * 22 /(7 * 180)), COM.y - factory * sqrt(robot_area) * sin(angleprev * 22 /(7 * 180)))) + temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))) / 2;
+			else if(pixdiffy > pixdiffx) // && angleprev > 45 && angleprev < 135)
+				thresh = (temp.at<uchar>(Point(COM.x - factorx *sqrt(robot_area) * cos(angleprev * 22 /(7 * 180)), COM.y + factory * sqrt(robot_area) * sin(angleprev * 22 /(7 * 180)))) + temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2))) / 2;
 			}
+			temp.copyTo(update_tmp);
+			cvDrawCircle(&IplImage(update_tmp),Point(COM.x - factorx *sqrt(robot_area) * cos(angleprev * 22 /(7 * 180)), COM.y + factory * sqrt(robot_area) * sin(angleprev * 22 /(7 * 180))),3,Scalar(255,0,0),1);
+			cvDrawCircle(&IplImage(update_tmp),Point(COM.x + factorx *sqrt(robot_area) * cos(angleprev * 22 /(7 * 180)), COM.y - factory * sqrt(robot_area) * sin(angleprev * 22 /(7 * 180))),3,Scalar(255,0,0),1);
+			qDebug("Pixel values at checkpoints : %d  %d ",temp.at<uchar>(Point(COM.x - factorx *sqrt(robot_area) * cos(angleprev * 22 /(7 * 180)), COM.y + factory * sqrt(robot_area) * sin(angleprev * 22 /(7 * 180)))) ,temp.at<uchar>(Point(COM.x + factorx *sqrt(robot_area) * cos(angleprev * 22 /(7 * 180)), COM.y - factory * sqrt(robot_area) * sin(angleprev * 22 /(7 * 180))))); 
+		imshow("CheckPoints",update_tmp);
 			/*if(temp.at<uchar>(Point(COM)) > 100)
 			{cvDrawCircle(im,Point(COM),4,Scalar::all(255),1);\
 			cv:threshold(frame,frame,thresh,max_thresh,thresh_type);
@@ -1151,7 +1117,7 @@ void MainWindow::on_trackbt_pushed(){
 			qDebug()<<"COM Pixel "<<temp.at<uchar>(Point(COM)) << " Difference : "<< pixdiffx << " " << pixdiffy<<" Outside Pixel value : "<<temp.at<uchar>(Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2));
 			qDebug() << " Thresh type : " << thresh_type;
 			cvDrawCircle(im,Point(boundrect.x + boundrect.width, boundrect.y + boundrect.height / 2),3,Scalar::all(255),1);
-			 //thresh = cv::Mat(frame1).at<uchar>(Point(COM))- 5;
+				//thresh = cv::Mat(frame1).at<uchar>(Point(COM))- 5;
 			if(check == 1 && !thresh_type){
 				if(maxCarea < robot_area / 1.35)
 					thresh = int(0.8 * thresh) ;
@@ -1234,8 +1200,6 @@ void MainWindow::on_trackbt_pushed(){
 		drawContours(boundcn,contours,contour,Scalar::all(255),1);
 		rott_rect = minAreaRect(contours[contour]);}
 		rott_rect.points(rotrect);
-		//if(loopcount == 1)
-			//robot_area = mt.m00;
 		for(int i = 0; i < 3 ; i++)
 			line(boundcn,rotrect[i],rotrect[i+1],Scalar::all(255),1);
 		line(boundcn,rotrect[3],rotrect[0],Scalar::all(255),1); 
@@ -1263,7 +1227,7 @@ void MainWindow::on_trackbt_pushed(){
 		obj_or.copyTo(object);
 		}
 
-printpos : 
+	printpos : 
 		this->mutex.unlock();
 		processing_status = true;
 		if(loopcount > 0){
@@ -1293,7 +1257,7 @@ printpos :
 		cvPutText(im,angle_s.c_str(),cvPoint(20,40),&font,Scalar(0,255,255));
 		//cvPutText(im,pos.c_str(),org,&font, cv::Scalar(255,255,255));
 
-next:
+	next:
 		//ui->tracksett_gb->setText("Robot Area : "+QString::number(robot_area));
 		//ui->errorlog_label->setText(QString("Thresh Type : ")+QString::number(thresh_type));
 		//thresh_type = 0;
@@ -1302,9 +1266,8 @@ next:
 		info += std::string(int(filename.find("me No.")) - info.size() ,' ') + std::to_string(long double(loopcount + 1)) + "\n";
 		fwrite(info.c_str(),sizeof(char), info.size(),fp); 
 		cvDrawCircle(im,Point(COM),5,Scalar(255,0,255),1);
-		cvDrawCircle(im,Point(boundrect.x + boundrect.width + 20,boundrect.y + boundrect.height / 2),4,Scalar::all(255),1);
-		if(loopcount == 5)
-		imshow("Good Matches", cv::Mat(im));//break;
+		//cvDrawCircle(im,Point(boundrect.x + boundrect.width + 20,boundrect.y + boundrect.height / 2),4,Scalar::all(255),1);
+		//imshow("Good Matches", cv::Mat(im));
 		key = waitKey(10);
 		cv::resize(cv::Mat(im),temp,Size(ui->Video_wn->width(),ui->Video_wn->height()));
 		if(clicks && clicks <= 4 && ui->setwaypts_cb->isChecked()){
@@ -1312,21 +1275,25 @@ next:
 			for(int k = 0; k < clicks; k++)
 			{
 				cvDrawCircle(&IplImage(temp),waypoints[k],3,Scalar(180,180,0),1);
+				cvDrawCircle(im,Point(waypoints[k].x * im->width / image.cols,waypoints[k].y * im->height / image.rows),3,Scalar(180,180,0),1);
 				point = string("Waypoint") + std::to_string(long double(k + 1));
 				cvPutText(&IplImage(temp),point.c_str(),Point(waypoints[k].x + 3, waypoints[k].y + 3),&font,Scalar::all(180));
+				cvPutText(&IplImage(temp),point.c_str(),Point(waypoints[k].x * im->width / image.cols + 3, waypoints[k].y * im->height / image.rows + 3),&font,Scalar::all(180));
 			}
 		}
+		cvPutText(im,pos.c_str(),org,&font, cv::Scalar(255,255,0));
+		if(ui->videofile_cb->isChecked())
+			//output_video.write(cv::Mat(im));
+			cvWriteFrame(output_video,im);
 		Qim = Mat2QImage(temp, Qim);
 		this->scene->clear();
 		this->scene->addPixmap(QPixmap::fromImage(*Qim));
-	//	delete &temp;
 	//	ui->Video_wn->fitInView(QRectF(0, 0,ui->Video_wn->width(), ui->Video_wn->height()),Qt::KeepAspectRatio);
 		loopcount++;
-		//imshow("Background",object);
 		if(loopcount == 100){
 			end = time(NULL);
 			ui->errorlog_label->setText("Frame processing rate : "+QString::number(100.0/difftime(end,start)));}
-	cvReleaseImage(&im); //cvReleaseImage(&frameprev); cvReleaseImage(&frame1);
+	cvReleaseImage(&im); 
 	}
 	/*throw String("ERROR! Lost Tracking!");
 	}
@@ -1336,6 +1303,7 @@ next:
 		waypointspath_control * wthread = (waypointspath_control *)wayptspath_thread;
 		wthread->wayptno = clicks;
 		wthread->quit();}*/
+	//cvReleaseVideoWriter(&output_video);
 	cvReleaseImage(&frameprev);
 	cvReleaseImage(&frame1);
 	fclose(fp);
@@ -1356,7 +1324,8 @@ void MainWindow::DelayMS(UINT delay)
 }
 
 void MainWindow::on_Stopcapturepb_pushed(){
-	//ui->errorlog_label->setText("Stop Capture Slot entered"); 
+	if(ui->track_cb->isChecked())
+		return;
 	stop_capture = true;
 	/*if(ui->stream_filemenu->currentIndex() == 1){
 		//cam.RetrieveBuffer(&rawImage);
@@ -1374,29 +1343,12 @@ void MainWindow::on_Stopcapturepb_pushed(){
 	if(scene == NULL){
 		scene  = new QGraphicsScene(this);
 		ui->Video_wn->setScene(scene);}
-	if(image.data)
-		scene->addPixmap(QPixmap::fromImage(*Qim));
-	//QCoreApplication::instance()->exit();
+	if(image.data){
+		Qim = Mat2QImage(image,Qim);
+		scene->addPixmap(QPixmap::fromImage(*Qim));}
 }
 
 bool MainWindow::send_serialportcommand(BYTE * data_command){
-	/*DCB serialParams = {0};
-	COMMTIMEOUTS timeout = {0};
-	serialParams.DCBlength = sizeof(serialParams);
-
-	GetCommState(serialHandle, &serialParams);
-	serialParams.BaudRate = 9600;
-	serialParams.ByteSize = 8;
-	serialParams.StopBits = ONESTOPBIT;
-	serialParams.Parity = 0;
-	GetCommState(serialHandle, &serialParams);
-
-	timeout.ReadIntervalTimeout = 50;
-	timeout.ReadTotalTimeoutConstant = 50;
-	timeout.ReadTotalTimeoutMultiplier = 50;
-	timeout.WriteTotalTimeoutConstant = 50;
-	timeout.WriteTotalTimeoutMultiplier = 10;
-	SetCommTimeouts(serialHandle, &timeout);*/
 	DWORD toBeWritten = 7;
 	DWORD* written = (DWORD*)malloc(sizeof(DWORD));
 	LPDWORD event;
@@ -1432,7 +1384,15 @@ void MainWindow::get_coilcommand(QString coil){
 	}
 }
 
-//void MainWindow::open_helpwindow(){
+void MainWindow::open_helpwindow(){
+	//QVBoxLayout * help_layout = new QVBoxLayout();
+	//QDialog * help_dlg = new QDialog();
+	//help_wn->show();
+	//help_layout->addWidget(help_wn);
+	//help_dlg->setLayout(help_layout);
+	help_wn->exec();
+	//help_dlg->exec();
+}
 
 void MainWindow::on_coilcontrol_automatic_pushed(){
 	for(int i = 0; i < 7; i++)

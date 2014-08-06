@@ -227,6 +227,10 @@ public:
     QHBoxLayout *horizontalLayout_21;
     QLabel *label;
     QLineEdit *filename_le;
+    QWidget *horizontalLayoutWidget_8;
+    QHBoxLayout *horizontalLayout_22;
+    QLabel *label_15;
+    QLineEdit *videofilename_le;
     QGroupBox *groupBox_5;
     QGraphicsView *template_wn;
     QLabel *label_9;
@@ -247,6 +251,7 @@ public:
     QPushButton *stopcapture_pb;
     QCheckBox *autoincrmnt_cb;
     QCheckBox *appendfile_cb;
+    QCheckBox *videofile_cb;
     QLabel *errorlog_label;
     QMenuBar *menuBar;
     QMenu *menuMobile_Microrobot_CController;
@@ -768,7 +773,7 @@ public:
         help_pb->setGeometry(QRect(50, 40, 61, 21));
         tracksett_gb = new QGroupBox(scrollAreaWidgetContents_2);
         tracksett_gb->setObjectName(QStringLiteral("tracksett_gb"));
-        tracksett_gb->setGeometry(QRect(10, 500, 361, 191));
+        tracksett_gb->setGeometry(QRect(10, 540, 361, 181));
         QFont font1;
         font1.setBold(true);
         font1.setWeight(75);
@@ -776,12 +781,12 @@ public:
         tracksett_gb->setAlignment(Qt::AlignCenter);
         label_4 = new QLabel(tracksett_gb);
         label_4->setObjectName(QStringLiteral("label_4"));
-        label_4->setGeometry(QRect(0, 25, 357, 16));
+        label_4->setGeometry(QRect(0, 15, 357, 16));
         label_4->setFont(font1);
         label_4->setAlignment(Qt::AlignCenter);
         layoutWidget1 = new QWidget(tracksett_gb);
         layoutWidget1->setObjectName(QStringLiteral("layoutWidget1"));
-        layoutWidget1->setGeometry(QRect(10, 40, 341, 41));
+        layoutWidget1->setGeometry(QRect(10, 30, 341, 41));
         layoutWidget1->setFont(font);
         horizontalLayout_3 = new QHBoxLayout(layoutWidget1);
         horizontalLayout_3->setSpacing(6);
@@ -802,7 +807,7 @@ public:
 
         layoutWidget2 = new QWidget(tracksett_gb);
         layoutWidget2->setObjectName(QStringLiteral("layoutWidget2"));
-        layoutWidget2->setGeometry(QRect(10, 80, 341, 32));
+        layoutWidget2->setGeometry(QRect(10, 70, 341, 32));
         horizontalLayout_2 = new QHBoxLayout(layoutWidget2);
         horizontalLayout_2->setSpacing(6);
         horizontalLayout_2->setContentsMargins(11, 11, 11, 11);
@@ -828,11 +833,11 @@ public:
 
         label_5 = new QLabel(tracksett_gb);
         label_5->setObjectName(QStringLiteral("label_5"));
-        label_5->setGeometry(QRect(10, 110, 331, 31));
+        label_5->setGeometry(QRect(10, 100, 331, 31));
         label_5->setAlignment(Qt::AlignCenter);
         layoutWidget3 = new QWidget(tracksett_gb);
         layoutWidget3->setObjectName(QStringLiteral("layoutWidget3"));
-        layoutWidget3->setGeometry(QRect(10, 140, 341, 41));
+        layoutWidget3->setGeometry(QRect(10, 130, 341, 41));
         horizontalLayout_4 = new QHBoxLayout(layoutWidget3);
         horizontalLayout_4->setSpacing(6);
         horizontalLayout_4->setContentsMargins(11, 11, 11, 11);
@@ -1031,7 +1036,7 @@ public:
         waypts_cycles->setGeometry(QRect(190, 50, 51, 20));
         groupBox_3 = new QGroupBox(scrollAreaWidgetContents_2);
         groupBox_3->setObjectName(QStringLiteral("groupBox_3"));
-        groupBox_3->setGeometry(QRect(20, 190, 341, 161));
+        groupBox_3->setGeometry(QRect(20, 170, 341, 161));
         groupBox_3->setFont(font1);
         groupBox_3->setAlignment(Qt::AlignCenter);
         label_11 = new QLabel(groupBox_3);
@@ -1127,7 +1132,7 @@ public:
         backgrndtype_dd->setFont(font);
         groupBox_4 = new QGroupBox(scrollAreaWidgetContents_2);
         groupBox_4->setObjectName(QStringLiteral("groupBox_4"));
-        groupBox_4->setGeometry(QRect(20, 370, 341, 121));
+        groupBox_4->setGeometry(QRect(20, 360, 341, 151));
         groupBox_4->setFont(font1);
         groupBox_4->setAlignment(Qt::AlignCenter);
         horizontalLayoutWidget_4 = new QWidget(groupBox_4);
@@ -1145,7 +1150,7 @@ public:
         pos_lb->setMaximumSize(QSize(100000, 16777215));
         QFont font2;
         font2.setFamily(QStringLiteral("MS Shell Dlg 2"));
-        font2.setPointSize(9);
+        font2.setPointSize(8);
         font2.setBold(false);
         font2.setWeight(50);
         pos_lb->setFont(font2);
@@ -1214,7 +1219,12 @@ public:
 
         label_2 = new QLabel(horizontalLayoutWidget_5);
         label_2->setObjectName(QStringLiteral("label_2"));
-        label_2->setFont(font2);
+        QFont font5;
+        font5.setFamily(QStringLiteral("MS Shell Dlg 2"));
+        font5.setPointSize(9);
+        font5.setBold(false);
+        font5.setWeight(50);
+        label_2->setFont(font5);
 
         horizontalLayout_16->addWidget(label_2);
 
@@ -1238,6 +1248,25 @@ public:
         filename_le->setFont(font3);
 
         horizontalLayout_21->addWidget(filename_le);
+
+        horizontalLayoutWidget_8 = new QWidget(groupBox_4);
+        horizontalLayoutWidget_8->setObjectName(QStringLiteral("horizontalLayoutWidget_8"));
+        horizontalLayoutWidget_8->setGeometry(QRect(10, 114, 321, 31));
+        horizontalLayout_22 = new QHBoxLayout(horizontalLayoutWidget_8);
+        horizontalLayout_22->setSpacing(6);
+        horizontalLayout_22->setContentsMargins(11, 11, 11, 11);
+        horizontalLayout_22->setObjectName(QStringLiteral("horizontalLayout_22"));
+        horizontalLayout_22->setContentsMargins(0, 0, 0, 0);
+        label_15 = new QLabel(horizontalLayoutWidget_8);
+        label_15->setObjectName(QStringLiteral("label_15"));
+        label_15->setFont(font);
+
+        horizontalLayout_22->addWidget(label_15);
+
+        videofilename_le = new QLineEdit(horizontalLayoutWidget_8);
+        videofilename_le->setObjectName(QStringLiteral("videofilename_le"));
+
+        horizontalLayout_22->addWidget(videofilename_le);
 
         groupBox_5 = new QGroupBox(scrollAreaWidgetContents_2);
         groupBox_5->setObjectName(QStringLiteral("groupBox_5"));
@@ -1348,7 +1377,7 @@ public:
         track_cb->setFont(font);
         capture_pb = new QPushButton(groupBox_6);
         capture_pb->setObjectName(QStringLiteral("capture_pb"));
-        capture_pb->setGeometry(QRect(20, 80, 211, 23));
+        capture_pb->setGeometry(QRect(20, 80, 151, 23));
         capture_pb->setFont(font);
         horizontalLayoutWidget_7 = new QWidget(groupBox_6);
         horizontalLayoutWidget_7->setObjectName(QStringLiteral("horizontalLayoutWidget_7"));
@@ -1376,7 +1405,7 @@ public:
 
         stopcapture_pb = new QPushButton(groupBox_6);
         stopcapture_pb->setObjectName(QStringLiteral("stopcapture_pb"));
-        stopcapture_pb->setGeometry(QRect(290, 80, 201, 23));
+        stopcapture_pb->setGeometry(QRect(350, 80, 141, 23));
         stopcapture_pb->setFont(font);
         autoincrmnt_cb = new QCheckBox(groupBox_6);
         autoincrmnt_cb->setObjectName(QStringLiteral("autoincrmnt_cb"));
@@ -1386,6 +1415,10 @@ public:
         appendfile_cb->setObjectName(QStringLiteral("appendfile_cb"));
         appendfile_cb->setGeometry(QRect(370, 50, 131, 18));
         appendfile_cb->setFont(font);
+        videofile_cb = new QCheckBox(groupBox_6);
+        videofile_cb->setObjectName(QStringLiteral("videofile_cb"));
+        videofile_cb->setGeometry(QRect(190, 81, 141, 20));
+        videofile_cb->setFont(font);
         errorlog_label = new QLabel(scrollAreaWidgetContents_2);
         errorlog_label->setObjectName(QStringLiteral("errorlog_label"));
         errorlog_label->setGeometry(QRect(230, 60, 211, 61));
@@ -1401,6 +1434,7 @@ public:
         errorlog_label->setFrameShape(QFrame::Box);
         errorlog_label->setFrameShadow(QFrame::Raised);
         errorlog_label->setAlignment(Qt::AlignCenter);
+        errorlog_label->setWordWrap(true);
         scrollArea->setWidget(scrollAreaWidgetContents_2);
         Video_wn->raise();
         layoutWidget->raise();
@@ -1540,7 +1574,7 @@ public:
         backgrndtype_dd->insertItems(0, QStringList()
          << QApplication::translate("MainWindow", " Boundary Mask Type", 0)
         );
-        groupBox_4->setTitle(QApplication::translate("MainWindow", "Robot Tracking Data", 0));
+        groupBox_4->setTitle(QApplication::translate("MainWindow", "Robot Tracking Data and File Settings", 0));
         pos_lb->setText(QApplication::translate("MainWindow", "Position :", 0));
         label_23->setText(QApplication::translate("MainWindow", "(", 0));
         label_26->setText(QApplication::translate("MainWindow", " ,", 0));
@@ -1548,6 +1582,7 @@ public:
         angle_lb->setText(QApplication::translate("MainWindow", "Angle :", 0));
         label_2->setText(QApplication::translate("MainWindow", "degrees", 0));
         label->setText(QApplication::translate("MainWindow", "Enter track information filename :", 0));
+        label_15->setText(QApplication::translate("MainWindow", "Enter Video filename (creates .wmv file)", 0));
         groupBox_5->setTitle(QApplication::translate("MainWindow", "Frame Processing Images ", 0));
         label_9->setText(QApplication::translate("MainWindow", "Captured Template", 0));
         label_10->setText(QApplication::translate("MainWindow", "Boundary Field Detected", 0));
@@ -1573,6 +1608,7 @@ public:
         stopcapture_pb->setText(QApplication::translate("MainWindow", "Stop Streaming ", 0));
         autoincrmnt_cb->setText(QApplication::translate("MainWindow", "Auto-increment filename", 0));
         appendfile_cb->setText(QApplication::translate("MainWindow", "Append to existing file", 0));
+        videofile_cb->setText(QApplication::translate("MainWindow", "Create Tracking Video File ", 0));
         errorlog_label->setText(QApplication::translate("MainWindow", "Error Log", 0));
         menuMobile_Microrobot_CController->setTitle(QApplication::translate("MainWindow", "Mobile Microrobot Controller", 0));
     } // retranslateUi
